@@ -6,7 +6,7 @@
 
 Pipeline end-to-end para detecção e comunicação de viés editorial em veículos jornalísticos brasileiros, usando **BERTimbau** + **FactNews** + análise de espectro ideológico.
 
-> Trabalho de Conclusão de Curso — Indra Seixas Neiva — USP (2025)
+> Trabalho de Conclusão de Curso — Indra Seixas Neiva — USP (2026)
 
 ---
 
