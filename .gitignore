@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Ambiente
+.env
+
+# Modelos (grandes demais para o git — use Git LFS ou HuggingFace Hub)
+models/
+
+# Dados brutos
+data/*.csv
+data/*.jsonl
+
+# Banco de dados
+*.db
+*.sqlite
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

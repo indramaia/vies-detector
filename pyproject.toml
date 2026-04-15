@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "vies_detector"
+version = "0.1.0"
+description = "Detecção automatizada de viés editorial em notícias brasileiras via BERTimbau"
+authors = [{ name = "Indra Seixas Neiva", email = "indra@usp.br" }]
+license = { text = "MIT" }
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=vies_detector --cov-report=term-missing"

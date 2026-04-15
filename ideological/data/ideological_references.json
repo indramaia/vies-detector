@@ -1,0 +1,76 @@
+{
+  "_metadata": {
+    "description": "Mapeamento ideológico de veículos jornalísticos brasileiros baseado em referências acadêmicas consolidadas.",
+    "sources": [
+      "FERES JÚNIOR et al. Manchetômetro. IESP/UERJ, 2013-.",
+      "ORTELLADO, P.; RIBEIRO, M. Estamos todos desinformados? GPOPAI/USP, 2018.",
+      "INTERVOZES. Donos da Mídia. 2017.",
+      "REUTERS INSTITUTE. Digital News Report 2024."
+    ],
+    "scale": "[-1.0, +1.0] onde -1 = progressista, 0 = centro, +1 = conservador",
+    "caveat": "Estes posicionamentos refletem análises acadêmicas de períodos específicos e podem não capturar mudanças editoriais recentes. O score ideológico NÃO é julgamento do sistema — é contextualização baseada em literatura científica revisada por pares.",
+    "last_updated": "2025-01",
+    "methodology": "Média ponderada de classificações de múltiplas fontes acadêmicas. Incerteza estimada (±) indica divergência entre fontes."
+  },
+  "vehicles": {
+    "folha": {
+      "name": "Folha de S.Paulo",
+      "url": "https://www.folha.uol.com.br",
+      "ideology_score": 0.1,
+      "uncertainty": 0.2,
+      "position_label": "Centro",
+      "description": "Considerado de centro a centro-direita pela maioria dos estudos, com linha editorial independente e histórico de cobertura crítica de diferentes governos.",
+      "academic_refs": [
+        "FERES JÚNIOR et al., 2013 — classificação: centro-direita",
+        "ORTELLADO; RIBEIRO, 2018 — classificação: centro"
+      ]
+    },
+    "estadao": {
+      "name": "O Estado de S. Paulo",
+      "url": "https://www.estadao.com.br",
+      "ideology_score": 0.35,
+      "uncertainty": 0.15,
+      "position_label": "Centro-direita",
+      "description": "Consistentemente classificado como centro-direita, com posicionamento liberal-conservador em pautas econômicas e de segurança.",
+      "academic_refs": [
+        "FERES JÚNIOR et al., 2013 — classificação: centro-direita",
+        "ORTELLADO; RIBEIRO, 2018 — classificação: centro-direita"
+      ]
+    },
+    "oglobo": {
+      "name": "O Globo",
+      "url": "https://oglobo.globo.com",
+      "ideology_score": 0.2,
+      "uncertainty": 0.2,
+      "position_label": "Centro",
+      "description": "Classificado como centro a centro-direita; integra o maior conglomerado de mídia do país (Grupo Globo).",
+      "academic_refs": [
+        "FERES JÚNIOR et al., 2013 — classificação: centro",
+        "INTERVOZES, 2017 — grupo Globo controla ~73% da audiência televisiva"
+      ]
+    },
+    "gazetadopovo": {
+      "name": "Gazeta do Povo",
+      "url": "https://www.gazetadopovo.com.br",
+      "ideology_score": 0.65,
+      "uncertainty": 0.15,
+      "position_label": "Direita",
+      "description": "Reposicionamento editorial explícito para direita conservadora a partir de 2017, com cobertura favorável a pautas de segurança pública, livre-mercado e valores tradicionais.",
+      "academic_refs": [
+        "ORTELLADO; RIBEIRO, 2018 — classificação: direita"
+      ]
+    },
+    "cartacapital": {
+      "name": "Carta Capital",
+      "url": "https://www.cartacapital.com.br",
+      "ideology_score": -0.7,
+      "uncertainty": 0.15,
+      "position_label": "Esquerda",
+      "description": "Linha editorial explicitamente progressista; cobertura crítica de políticas neoliberais e conservadoras.",
+      "academic_refs": [
+        "FERES JÚNIOR et al., 2013 — classificação: esquerda",
+        "ORTELLADO; RIBEIRO, 2018 — classificação: esquerda"
+      ]
+    }
+  }
+}
