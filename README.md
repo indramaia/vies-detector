@@ -143,3 +143,4 @@ python classifier/train.py --data data/factnews.csv --output models/bertimbau-bi
 
 MIT © Indra Seixas Neiva — USP 2025
 "# vies-detector" 
+"# vies-detector" 
