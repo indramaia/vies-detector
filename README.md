@@ -102,9 +102,17 @@ python api/app.py
 ## 🤖 Treinamento do Classificador
 
 ```bash
-# Faça download do FactNews (VARGAS et al., 2023) e salve em data/factnews.csv
+# Faça download do FactNews https://github.com/franciellevargas/FactNews (VARGAS et al., 2023) e salve em data/factnews.csv
+
 python classifier/train.py --data data/factnews.csv --output models/bertimbau-bias
 ```
+
+Remapeamento para treino usando Pytorch:
+| FactNews | Significado          | Índice PyTorch  | 
+|----------|----------------------|-----------------|
+|   – 1    | fortemente enviesada |      2          |
+|     0    | factual              |      0          |
+|     1    | enviesada            |      1          |
 
 > O modelo treinado deve ser salvo em `models/bertimbau-bias/` e referenciado no `.env`.
 
@@ -112,14 +120,30 @@ python classifier/train.py --data data/factnews.csv --output models/bertimbau-bi
 
 ## 📊 BiasScore
 
-| Faixa      | Interpretação                    |
-|------------|----------------------------------|
-| 0.0 – 0.4  | Predominantemente factual        |
-| 0.4 – 0.8  | Viés moderado                    |
-| 0.8 – 1.4  | Viés elevado                     |
-| 1.4 – 2.0  | Linguagem fortemente enviesada   |
+O BiasScore mede a **intensidade média de viés** de um artigo, ponderando cada sentença pelo grau de enviesamento detectado pelo classificador:
+Sentenças factuais têm peso 0 e não elevam o score. O resultado varia de **0** (totalmente factual) a **2** (totalmente fortemente enviesado).
 
----
+### Exemplo — artigo com 10 sentenças
+
+| Composição                                      | Cálculo             | BiasScore |
+|-------------------------------------------------|---------------------|-----------|
+| 10 factuais                                     | (0 + 0) / 10        | 0.0       |
+| 8 factuais · 2 enviesadas                       | (2×1 + 0) / 10      | 0.2       |
+| 6 factuais · 4 enviesadas                       | (4×1 + 0) / 10      | 0.4       |
+| 4 factuais · 4 enviesadas · 2 fort. enviesadas  | (4×1 + 2×2) / 10    | 0.8       |
+| 10 fortemente enviesadas                        | (0 + 10×2) / 10     | 2.0       |
+
+### Interpretação das faixas
+
+| Faixa      | Interpretação                                                                 |
+|------------|-------------------------------------------------------------------------------|
+| 0.0 – 0.4  | Predominantemente factual — poucas sentenças enviesadas, intensidade leve     |
+| 0.4 – 0.8  | Viés moderado — presença notável de sentenças enviesadas                      |
+| 0.8 – 1.4  | Viés elevado — mistura significativa de enviesadas e fortemente enviesadas    |
+| 1.4 – 2.0  | Linguagem fortemente enviesada — alta concentração de conteúdo carregado      |
+
+> **Nota:** o BiasScore é uma estimativa probabilística baseada nos padrões aprendidos pelo modelo sobre o FactNews. Não representa um julgamento objetivo sobre a qualidade ou a veracidade do veículo.
+ 
 
 ## ⚠️ Limitações e Uso Responsável
 
@@ -141,6 +165,6 @@ python classifier/train.py --data data/factnews.csv --output models/bertimbau-bi
 
 ## Licença
 
-MIT © Indra Seixas Neiva — USP 2025
+© Indra Seixas Neiva — USP 2026
 "# vies-detector" 
 "# vies-detector" 
