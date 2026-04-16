@@ -144,6 +144,7 @@ Sentenças factuais têm peso 0 e não elevam o score. O resultado varia de **0*
 
 > **Nota:** o BiasScore é uma estimativa probabilística baseada nos padrões aprendidos pelo modelo sobre o FactNews. Não representa um julgamento objetivo sobre a qualidade ou a veracidade do veículo.
  
+---
 
 ## ⚠️ Limitações e Uso Responsável
 
