@@ -116,6 +116,7 @@ Remapeamento para treino usando Pytorch:
 
 > O modelo treinado deve ser salvo em `models/bertimbau-bias/` e referenciado no `.env`.
 
+
 ---
 
 ## 📊 BiasScore
@@ -145,6 +146,60 @@ Sentenças factuais têm peso 0 e não elevam o score. O resultado varia de **0*
 > **Nota:** o BiasScore é uma estimativa probabilística baseada nos padrões aprendidos pelo modelo sobre o FactNews. Não representa um julgamento objetivo sobre a qualidade ou a veracidade do veículo.
  
 ---
+
+## 🧪 Experimento de Treinamento
+
+### Dataset e Divisão
+
+O classificador foi treinado sobre o **FactNews** (Vargas et al., RANLP 2023),
+composto por 6.191 sentenças de notícias brasileiras anotadas por especialistas.
+
+| Conjunto   | Proporção | Sentenças | Papel                                              |
+|------------|-----------|-----------|----------------------------------------------------|
+| Treino     | 80%       | 4.952     | O modelo aprende os padrões linguísticos           |
+| Validação  | 10%       | 619       | Monitora overfitting e decide quando parar         |
+| Teste      | 10%       | 620       | Avaliação final — dados nunca vistos pelo modelo   |
+
+A divisão é **estratificada por rótulo**: cada conjunto mantém a mesma
+proporção de classes do dataset original, evitando avaliação enviesada.
+
+| Classe               | Total | % do dataset |
+|----------------------|-------|--------------|
+| Factual              | 4.242 | 68,5%        |
+| Fortemente enviesada | 1.391 | 22,5%        |
+| Enviesada            | 558   | 9,0%         |
+
+### Resultados
+
+Modelo base: `neuralmind/bert-base-portuguese-cased` (BERTimbau)  
+Tempo de treinamento: ~1h28min (CPU) · 5 épocas · batch efetivo 32
+
+| Época | Macro-F1 (val) | Eval Loss |
+|-------|---------------|-----------|
+| 1     | 0.677         | 0.359     |
+| 2     | 0.787         | **0.322** |
+| 3     | 0.794         | 0.361     |
+| 4     | 0.799         | 0.425     |
+| 5     | **0.801**     | 0.449     |
+
+### Desempenho no Teste (Macro-F1: **0.80**)
+
+| Classe               | Precision | Recall | F1   | Suporte |
+|----------------------|-----------|--------|------|---------|
+| Factual              | 0.92      | 0.95   | 0.94 | 425     |
+| Enviesada            | 0.57      | 0.50   | 0.53 | 56      |
+| Fortemente enviesada | 0.95      | 0.91   | 0.93 | 139     |
+| **Macro avg**        | **0.82**  | **0.79**| **0.80** | 620 |
+
+> **Interpretação:** o modelo performa bem nas classes extremas (factual e
+> fortemente enviesada), mas tem dificuldade com a classe intermediária
+> "enviesada" (F1=0.53) — reflexo direto do desequilíbrio do dataset, onde
+> essa classe representa apenas 9% das sentenças. Esse comportamento é
+> esperado e está documentado como limitação do sistema.
+
+---
+
+
 
 ## ⚠️ Limitações e Uso Responsável
 
