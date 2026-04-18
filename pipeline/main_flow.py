@@ -1,7 +1,6 @@
 """
 pipeline/main_flow.py
 ─────────────────────
-Orquestração do pipeline completo via Prefect.
 
 Fluxo:
     1. [collector]    Coleta RSS de todos os veículos ativos
@@ -19,8 +18,6 @@ import os
 from datetime import datetime, timezone
 
 from loguru import logger
-from prefect import flow, task, get_run_logger
-
 from collector import fetch_all_feeds, Deduplicator, ArticleData
 from classifier import SentenceClassifier
 from aggregation import compute_article_bias, aggregate_by_vehicle, ArticleBiasResult
@@ -38,28 +35,24 @@ from scripts.setup_db import (
 #  TASKS — cada camada é uma task Prefect com retry automático
 # ══════════════════════════════════════════════════════════════════════════════
 
-@task(name="collect-rss", retries=2, retry_delay_seconds=30)
 def task_collect(db_session) -> list[ArticleData]:
     """Camada 1: coleta RSS com deduplicação baseada no banco de dados."""
-    log = get_run_logger()
 
     # Backend de deduplicação: hashes já presentes no banco
     existing_hashes = {row.url_hash for row in db_session.query(ArticleRecord.url_hash).all()}
-    log.info(f"Hashes já registrados no banco: {len(existing_hashes)}")
+    logger.info(f"Hashes já registrados no banco: {len(existing_hashes)}")
 
     dedup = Deduplicator(backend=existing_hashes)
     articles = fetch_all_feeds(dedup)
-    log.info(f"Artigos novos coletados: {len(articles)}")
+    logger.info(f"Artigos novos coletados: {len(articles)}")
     return articles
 
 
-@task(name="classify-sentences", retries=1)
 def task_classify(articles: list[ArticleData]) -> list[ArticleBiasResult]:
     """Camada 2 + 3: classifica sentenças e calcula BiasScore por artigo."""
-    log = get_run_logger()
-
+    
     if not articles:
-        log.info("Nenhum artigo novo para classificar.")
+        logger.info("Nenhum artigo novo para classificar.")
         return []
 
     clf = SentenceClassifier()
@@ -77,18 +70,16 @@ def task_classify(articles: list[ArticleData]) -> list[ArticleBiasResult]:
         )
         results.append(bias_result)
 
-    log.info(f"Artigos classificados: {len(results)}")
+    logger.info(f"Artigos classificados: {len(results)}")
     return results
 
 
-@task(name="persist-results")
 def task_persist(
     articles: list[ArticleData],
     bias_results: list[ArticleBiasResult],
     db_session,
 ) -> None:
     """Persiste metadados, resultados de artigos e sentenças no banco."""
-    log = get_run_logger()
 
     bias_map = {r.url_hash: r for r in bias_results}
 
@@ -128,20 +119,18 @@ def task_persist(
                 db_session.add(sent_rec)
 
     db_session.commit()
-    log.info(f"Persistidos {len(articles)} artigos no banco.")
+    logger.info(f"Persistidos {len(articles)} artigos no banco.")
 
 
-@task(name="aggregate-and-contextualize")
 def task_aggregate_contextualize(
     bias_results: list[ArticleBiasResult],
     db_session,
     window_days: int = 30,
 ) -> None:
     """Camadas 3 + 4: agrega por veículo e salva índice com contexto ideológico."""
-    log = get_run_logger()
-
+  
     if not bias_results:
-        log.info("Nenhum resultado para agregar.")
+        logger.info("Nenhum resultado para agregar.")
         return
 
     vehicle_indices = aggregate_by_vehicle(bias_results, window_days=window_days)
@@ -165,11 +154,11 @@ def task_aggregate_contextualize(
         db_session.merge(rec)  # upsert por ideology_id
 
     db_session.commit()
-    log.info(f"Índices atualizados para {len(contexts)} veículos.")
+    logger.info(f"Índices atualizados para {len(contexts)} veículos.")
 
-    log.info("=== ESPECTRO ATUAL ===")
+    logger.info("=== ESPECTRO ATUAL ===")
     for v in spectrum:
-        log.info(
+        logger.info(
             f"  {v['source_name']:25s} | "
             f"BiasScore={v['bias_score']:.2f} | "
             f"Ideologia={v['ideology_score']:+.2f} ({v['position_label']})"
@@ -180,11 +169,9 @@ def task_aggregate_contextualize(
 #  FLOW PRINCIPAL
 # ══════════════════════════════════════════════════════════════════════════════
 
-@flow(name="vies-detector-pipeline", log_prints=True)
 def run_pipeline(window_days: int = 30) -> None:
     """
     Pipeline completo: coleta → classifica → persiste → agrega → contextualiza.
-
     Pode ser agendado via Prefect:
         prefect deployment apply pipeline/deployment.yaml
     """

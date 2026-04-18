@@ -29,7 +29,7 @@ from transformers import (
 # ── Constantes ────────────────────────────────────────────────────────────────
 DEFAULT_MODEL_PATH = os.getenv(
     "MODEL_PATH",
-    "neuralmind/bert-base-portuguese-cased",  # fallback: modelo base sem fine-tuning
+    "models/bertimbau-bias"  # modelo fine-tuned no FactNews
 )
 
 # Mapeamento de rótulos conforme remapeamento do FactNews
