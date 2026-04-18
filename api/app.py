@@ -49,7 +49,11 @@ def _vehicle_index_to_dict(rec: VehicleIndexRecord) -> dict:
     return {
         "ideology_id": rec.ideology_id,
         "source_name": rec.source_name,
-        "computed_at": rec.computed_at.isoformat() if rec.computed_at else None,
+        "computed_at": (
+            rec.computed_at.isoformat()
+            if hasattr(rec.computed_at, "isoformat")
+            else rec.computed_at
+        ) if rec.computed_at else None,
         "window_days": rec.window_days,
         "article_count": rec.article_count,
         "mean_bias": rec.mean_bias,
