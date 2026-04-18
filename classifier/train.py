@@ -48,13 +48,16 @@ from .model_loader import LABEL2ID, ID2LABEL, NUM_LABELS, MAX_LENGTH
 
 # ── Hiperparâmetros (VARGAS et al., 2023; DEVLIN et al., 2019) ───────────────
 BASE_MODEL = "neuralmind/bert-base-portuguese-cased"
-LEARNING_RATE = 2e-5
+# LEARNING_RATE = 2e-5      # original — convergência rápida, risco de overfitting
+LEARNING_RATE = 1e-5         # reduzido: aprende mais devagar, generaliza melhor
 PER_DEVICE_TRAIN_BATCH_SIZE = 8
 GRADIENT_ACCUMULATION_STEPS = 4   # batch efetivo = 32
 NUM_EPOCHS = 5
 WARMUP_RATIO = 0.1
-WEIGHT_DECAY = 0.01
-EARLY_STOPPING_PATIENCE = 2
+# WEIGHT_DECAY = 0.01       # original — regularização L2 fraca
+WEIGHT_DECAY = 0.1           # aumentado 10x: penaliza pesos grandes, reduz memorização
+# EARLY_STOPPING_PATIENCE = 2  # original — parava cedo demais na época 2
+EARLY_STOPPING_PATIENCE = 3   # aumentado: dá mais chance ao modelo antes de parar
 
 
 # ── Métricas ──────────────────────────────────────────────────────────────────
@@ -155,6 +158,9 @@ def train(data_path: str, output_dir: str) -> None:
         id2label=ID2LABEL,
         label2id=LABEL2ID,
     )
+    # Dropout aumentado para reduzir memorização (padrão BERT: 0.1)
+    model.config.hidden_dropout_prob = 0.2
+    model.config.attention_probs_dropout_prob = 0.2
 
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
@@ -174,6 +180,8 @@ def train(data_path: str, output_dir: str) -> None:
         greater_is_better=True,
         logging_dir=os.path.join(output_dir, "logs"),
         logging_steps=50,
+        # label_smoothing_factor=0.0,  # original — sem suavização, modelo fica overconfident
+        label_smoothing_factor=0.1,   # penaliza confiança excessiva, melhora generalização
         fp16=torch.cuda.is_available(),
         report_to="none",  # Desativa integração com MLflow (ajuste conforme necessário
     )
