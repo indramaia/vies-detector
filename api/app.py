@@ -36,7 +36,11 @@ from aggregation import VehicleIndex
 app = Flask(__name__)
 
 _cors_origins = os.getenv("CORS_ORIGINS", "*")
-CORS(app, origins=_cors_origins.split(",") if _cors_origins != "*" else "*")
+CORS(app, origins=[
+    "https://biasradar.lovable.app",
+    "https://id-preview--587bd150-dcce-40ab-aa7c-1c07eed8c13a.lovable.app",
+    "http://localhost:*"
+])
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
