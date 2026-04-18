@@ -64,7 +64,7 @@ vies_detector/
 │   └── run_pipeline.py
 ├── docs/
 │   └── architecture.md
-├── .env.example
+├── .env
 ├── .gitignore
 ├── requirements.txt
 ├── pyproject.toml
@@ -84,7 +84,7 @@ pip install -r requirements.txt
 python -m nltk.downloader punkt punkt_tab
 
 # 2. Configure variáveis de ambiente
-cp .env.example .env
+cp .env .env
 # Edite .env com suas configurações
 
 # 3. Inicialize o banco de dados
