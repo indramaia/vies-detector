@@ -29,7 +29,11 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///vies_detector.db")
-engine = create_engine(os.environ["DATABASE_URL"])
+engine = create_engine(
+    os.environ["DATABASE_URL"],
+    use_insertmanyvalues=False,
+    implicit_returning=False,
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
