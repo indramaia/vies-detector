@@ -63,6 +63,8 @@ class ArticleRecord(Base):
     n_factual = Column(Integer, nullable=True)
     n_biased = Column(Integer, nullable=True)
     n_strongly_biased = Column(Integer, nullable=True)
+    image_url = Column(Text, nullable=True)
+
 
 
 class SentenceRecord(Base):
