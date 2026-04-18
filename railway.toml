@@ -1,0 +1,10 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "pip install -r requirements-api.txt"
+
+[deploy]
+startCommand = "gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 60 api.app:app"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

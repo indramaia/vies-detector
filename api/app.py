@@ -34,7 +34,9 @@ from ideological import get_spectrum_summary, contextualize_all
 from aggregation import VehicleIndex
 
 app = Flask(__name__)
-CORS(app)
+
+_cors_origins = os.getenv("CORS_ORIGINS", "*")
+CORS(app, origins=_cors_origins.split(",") if _cors_origins != "*" else "*")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -72,6 +74,21 @@ def _article_to_dict(rec: ArticleRecord) -> dict:
         "n_biased": rec.n_biased,
         "n_strongly_biased": rec.n_strongly_biased,
     }
+
+
+# ── Error handlers ────────────────────────────────────────────────────────────
+
+@app.errorhandler(400)
+def bad_request(e):
+    return jsonify({"error": str(e.description)}), 400
+
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": str(e.description)}), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({"error": "Erro interno do servidor."}), 500
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
