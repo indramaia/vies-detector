@@ -223,4 +223,3 @@ Tempo de treinamento: ~1h28min (CPU) · 5 épocas · batch efetivo 32
 
 © Indra Seixas Neiva — USP 2026
 "# vies-detector" 
-"# vies-detector" 

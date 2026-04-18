@@ -1,7 +1,7 @@
 """
 pipeline
 ────────
-Orquestração das quatro camadas via Prefect.
+Orquestração das quatro camadas via Prefect. --> removi Prefect para simplificar, mas a estrutura de camadas permanece.
 """
 from .main_flow import run_pipeline
 

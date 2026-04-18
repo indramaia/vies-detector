@@ -13,15 +13,21 @@ Referências:
     VARGAS et al. FactNews (2023).
     LOSHCHILOV; HUTTER. AdamW (2019).
     HOWARD; RUDER. ULMFiT (2018).
+    
+Fine-Tuning do BERTimbau — Do Zero ao Classificador de Viés Editorial comentado para leitores sem experiência prévia em NLP:
+ O BERTimbau já "sabe português" — foi treinado em bilhões de palavras da Wikipedia e da web brasileira. 
+ Mas ele não sabe o que é viés editorial. O fine-tuning é como uma especialização: 
+ você pega esse modelo que já entende português e mostra para ele 4.952 sentenças de notícias que especialistas já classificaram. 
+ Ele aprende a associar padrões linguísticos (palavras carregadas, tom emocional, ausência de atribuição) com os rótulos:
+ factual / enviesada / fortemente enviesada. Depois de treinado, ele consegue classificar sentenças novas que nunca viu.
+    
 """
 
 from __future__ import annotations
-
 import argparse
 import os
 from pathlib import Path
-
-import mlflow
+# import mlflow
 import numpy as np
 import pandas as pd
 import torch
@@ -37,8 +43,8 @@ from transformers import (
     TrainingArguments,
     EarlyStoppingCallback,
 )
-
 from .model_loader import LABEL2ID, ID2LABEL, NUM_LABELS, MAX_LENGTH
+
 
 # ── Hiperparâmetros (VARGAS et al., 2023; DEVLIN et al., 2019) ───────────────
 BASE_MODEL = "neuralmind/bert-base-portuguese-cased"
@@ -56,11 +62,11 @@ EARLY_STOPPING_PATIENCE = 2
 def compute_metrics(eval_pred) -> dict:
     """
     Calcula Macro-F1 e acurácia.
-
     Macro-F1 é adotado como métrica principal por tratar todas as classes
     com igual peso, independentemente do desbalanceamento do FactNews.
     (SOKOLOVA; LAPALME, 2009)
     """
+    
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=-1)
     macro_f1 = f1_score(labels, preds, average="macro", zero_division=0)
@@ -86,6 +92,9 @@ def load_factnews(csv_path: str) -> DatasetDict:
     Divisão: 80/10/10 estratificada por rótulo.
     """
     df = pd.read_csv(csv_path)
+    
+    # Adaptar colunas do FactNews (sentences/classe → sentence/label)
+    df = df.rename(columns={'sentences': 'sentence', 'classe': 'label'})
 
     if "sentence" not in df.columns or "label" not in df.columns:
         raise ValueError("O CSV deve conter colunas 'sentence' e 'label'.")
@@ -166,7 +175,7 @@ def train(data_path: str, output_dir: str) -> None:
         logging_dir=os.path.join(output_dir, "logs"),
         logging_steps=50,
         fp16=torch.cuda.is_available(),
-        report_to="mlflow",
+        report_to="none",  # Desativa integração com MLflow (ajuste conforme necessário
     )
 
     trainer = Trainer(
@@ -180,38 +189,25 @@ def train(data_path: str, output_dir: str) -> None:
         callbacks=[EarlyStoppingCallback(early_stopping_patience=EARLY_STOPPING_PATIENCE)],
     )
 
-    with mlflow.start_run(run_name="bertimbau-factnews-finetune"):
-        mlflow.log_params({
-            "base_model": BASE_MODEL,
-            "learning_rate": LEARNING_RATE,
-            "batch_size_effective": PER_DEVICE_TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS,
-            "epochs": NUM_EPOCHS,
-            "max_length": MAX_LENGTH,
-        })
-
-        logger.info("Iniciando fine-tuning…")
-        trainer.train()
-
-        logger.info("Avaliando no conjunto de teste…")
-        test_results = trainer.predict(tokenized["test"])
-        preds = np.argmax(test_results.predictions, axis=-1)
-        labels = test_results.label_ids
-
-        report = classification_report(
-            labels, preds,
-            target_names=["factual", "enviesada", "fortemente_enviesada"],
-            zero_division=0,
-        )
-        macro_f1 = f1_score(labels, preds, average="macro", zero_division=0)
-
-        logger.info(f"\n{report}")
-        mlflow.log_metric("test_macro_f1", macro_f1)
-        mlflow.log_text(report, "classification_report.txt")
-
-        logger.info(f"Salvando modelo em: {output_dir}")
-        trainer.save_model(output_dir)
-        tokenizer.save_pretrained(output_dir)
-        mlflow.log_artifact(output_dir)
+    logger.info("Iniciando fine-tuning…")
+    trainer.train()
+    
+    logger.info("Avaliando no conjunto de teste…")
+    test_results = trainer.predict(tokenized["test"])
+    preds = np.argmax(test_results.predictions, axis=-1)
+    labels = test_results.label_ids
+    
+    report = classification_report(
+        labels, preds,
+        target_names=["factual", "enviesada", "fortemente_enviesada"],
+        zero_division=0,
+    )
+    macro_f1 = f1_score(labels, preds, average="macro", zero_division=0)
+    
+    logger.info(f"\n{report}")
+    logger.info(f"Salvando modelo em: {output_dir}")
+    trainer.save_model(output_dir)
+    tokenizer.save_pretrained(output_dir)
 
     logger.info(f"✅ Fine-tuning concluído. Macro-F1 no teste: {macro_f1:.4f}")
 

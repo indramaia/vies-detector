@@ -13,15 +13,15 @@ Também calcula:
     - Número de artigos na janela
     - Tendência (comparação com janela anterior)
 """
-
 from __future__ import annotations
 
 import statistics
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 from typing import Sequence
+from dataclasses import dataclass
 
 from .bias_score import ArticleBiasResult
+from datetime import datetime, timedelta, timezone
+
 
 
 @dataclass
