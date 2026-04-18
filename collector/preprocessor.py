@@ -26,13 +26,13 @@ from loguru import logger
 # Garante que o tokenizador de sentenças em pt-BR esteja disponível
 try:
     nltk.data.find("tokenizers/punkt_tab")
-except LookupError:
+except (LookupError, OSError):
     logger.info("Baixando tokenizador NLTK punkt_tab…")
     nltk.download("punkt_tab", quiet=True)
 
 try:
     nltk.data.find("tokenizers/punkt")
-except LookupError:
+except (LookupError, OSError):
     nltk.download("punkt", quiet=True)
 
 

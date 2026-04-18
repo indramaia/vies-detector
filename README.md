@@ -116,6 +116,7 @@ Remapeamento para treino usando Pytorch:
 
 > O modelo treinado deve ser salvo em `models/bertimbau-bias/` e referenciado no `.env`.
 
+
 ---
 
 ## 📊 BiasScore
@@ -146,6 +147,8 @@ Sentenças factuais têm peso 0 e não elevam o score. O resultado varia de **0*
  
 ---
 
+
+
 ## ⚠️ Limitações e Uso Responsável
 
 - O BiasScore é uma **estimativa probabilística**, não um julgamento objetivo.
@@ -167,5 +170,4 @@ Sentenças factuais têm peso 0 e não elevam o score. O resultado varia de **0*
 ## Licença
 
 © Indra Seixas Neiva — USP 2026
-"# vies-detector" 
 "# vies-detector" 

@@ -18,10 +18,8 @@ Tabela de referência:
 """
 
 from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Sequence
-
 from classifier.sentence_classifier import SentenceResult
 
 
