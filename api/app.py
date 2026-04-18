@@ -74,7 +74,12 @@ def _article_to_dict(rec: ArticleRecord) -> dict:
         "title": rec.title,
         "url": rec.url,
         "source_name": rec.source_name,
-        "published_at": rec.published_at.isoformat() if rec.published_at else None,
+        "published_at": (
+            rec.published_at.isoformat()
+            if hasattr(rec.published_at, "isoformat")
+            else rec.published_at
+        ) if rec.published_at else None,
+        "image_url": rec.image_url,
         "bias_score": rec.bias_score,
         "bias_interpretation": rec.bias_interpretation,
         "sentence_count": rec.sentence_count,
