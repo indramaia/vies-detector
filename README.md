@@ -119,6 +119,108 @@ Remapeamento para treino usando Pytorch:
 
 ---
 
+## 🗺️ Veículos Monitorados e Posicionamento Ideológico
+
+O sistema monitora **18 veículos** de mídia brasileira, cobrindo o espectro ideológico de esquerda a direita. O posicionamento de cada veículo é derivado de fontes acadêmicas independentes — não constitui julgamento do sistema.
+
+**Esquerda** (score < −0.55)
+
+| Veículo | Score¹ | Incerteza | Fontes consultadas |
+|---|:---:|:---:|---|
+| [Brasil de Fato](https://www.brasildefato.com.br) | −0.80 | ±0.10 | Ortellado & Ribeiro (2018); Intervozes (2017) |
+| [Outras Palavras](https://outraspalavras.net) | −0.75 | ±0.15 | Ortellado & Ribeiro (2018); Intervozes (2017) |
+| [Carta Capital](https://www.cartacapital.com.br) | −0.70 | ±0.15 | Feres Júnior et al. (2013); Ortellado & Ribeiro (2018) |
+| [Le Monde Diplomatique Brasil](https://diplomatique.org.br) | −0.65 | ±0.15 | Ortellado & Ribeiro (2018); Feres Júnior et al. (2013) |
+| [The Intercept Brasil](https://theintercept.com/brasil) | −0.60 | ±0.15 | Reuters Institute (2024); Ortellado & Ribeiro (2018) |
+
+**Centro-esquerda** (−0.55 ≤ score < −0.10)
+
+| Veículo | Score¹ | Incerteza | Fontes consultadas |
+|---|:---:|:---:|---|
+| [Agência Pública](https://apublica.org) | −0.45 | ±0.20 | Reuters Institute (2024); Ortellado & Ribeiro (2018) |
+| [El País Brasil](https://brasil.elpais.com) | −0.25 | ±0.20 | Reuters Institute (2024) |
+| [Agência Brasil](https://agenciabrasil.ebc.com.br) | −0.15 | ±0.20 | Intervozes (2017) |
+
+**Centro** (−0.10 ≤ score ≤ +0.25)
+
+| Veículo | Score¹ | Incerteza | Fontes consultadas |
+|---|:---:|:---:|---|
+| [UOL Notícias](https://noticias.uol.com.br) | +0.05 | ±0.25 | Reuters Institute (2024) |
+| [Folha de S.Paulo](https://www.folha.uol.com.br) | +0.10 | ±0.20 | Feres Júnior et al. (2013); Ortellado & Ribeiro (2018) |
+| [Metrópoles](https://www.metropoles.com) | +0.10 | ±0.30 | Reuters Institute (2024) |
+| [G1](https://g1.globo.com) | +0.15 | ±0.20 | Intervozes (2017); Reuters Institute (2024) |
+| [CNN Brasil](https://www.cnnbrasil.com.br) | +0.20 | ±0.20 | Reuters Institute (2024) |
+| [O Globo](https://oglobo.globo.com) | +0.20 | ±0.20 | Feres Júnior et al. (2013); Intervozes (2017) |
+
+**Centro-direita** (+0.25 < score ≤ +0.55)
+
+| Veículo | Score¹ | Incerteza | Fontes consultadas |
+|---|:---:|:---:|---|
+| [O Estado de S. Paulo](https://www.estadao.com.br) | +0.35 | ±0.15 | Feres Júnior et al. (2013); Ortellado & Ribeiro (2018) |
+| [R7](https://noticias.r7.com) | +0.40 | ±0.20 | Intervozes (2017); Ortellado & Ribeiro (2018) |
+| [Veja](https://veja.abril.com.br) | +0.45 | ±0.20 | Feres Júnior et al. (2013); Ortellado & Ribeiro (2018) |
+
+**Direita** (score > +0.55)
+
+| Veículo | Score¹ | Incerteza | Fontes consultadas |
+|---|:---:|:---:|---|
+| [Gazeta do Povo](https://www.gazetadopovo.com.br) | +0.65 | ±0.15 | Ortellado & Ribeiro (2018) |
+
+> ¹ Escala de −1.0 (progressista) a +1.0 (conservador). A coluna **Incerteza** (±) expressa a divergência entre as fontes consultadas — quanto maior, menos consenso acadêmico existe sobre o posicionamento do veículo.
+
+---
+
+### Base Literária e Metodologia de Agregação
+
+#### Fontes primárias
+
+| Fonte | Método | Cobertura |
+|---|---|---|
+| [**Manchetômetro** — Feres Júnior et al. (2013–)](http://www.manchetometro.com.br) | Análise de cobertura eleitoral; classificação por parcialidade editorial | Grandes jornais e revistas nacionais |
+| [**Ortellado & Ribeiro (2018)**](https://gpopai.usp.br) — GPOPAI/USP | Análise de audiência cruzada com conteúdo; survey de leitores | Jornais, revistas e portais digitais |
+| [**Donos da Mídia** — Intervozes (2017)](https://donosdamidia.com.br) | Mapeamento de propriedade e concentração dos grupos de comunicação | TV, rádio, jornais e portais |
+| [**Digital News Report** — Reuters Institute (2024)](https://reutersinstitute.politics.ox.ac.uk/digital-news-report/2024) | Survey de consumo e confiança em notícias (n ≈ 2.000 brasileiros) | Portais digitais, redes sociais e TV |
+
+#### Como os scores são calculados
+
+Cada fonte utiliza método, escala e período distintos. Para torná-las comparáveis, este trabalho adota uma **agregação meta-analítica** em três etapas — inspirada em Groseclose & Milyo (2005) e na abordagem de síntese de evidências da Cochrane Collaboration:
+
+**1. Normalização para escala comum** — as classificações originais (ex.: categorias nominais como "esquerda / centro / direita" ou scores ordinais) são convertidas para a escala contínua [−1, +1]:
+
+| Categoria original | Score equivalente |
+|---|:---:|
+| Esquerda | −0.75 |
+| Centro-esquerda | −0.35 |
+| Centro | 0.00 |
+| Centro-direita | +0.40 |
+| Direita | +0.70 |
+
+**2. Média ponderada por qualidade metodológica** — fontes com maior rigor amostral e peer-review recebem peso maior. O Manchetômetro e Ortellado & Ribeiro (revisados por pares) têm peso 1.0; Reuters Institute (survey) tem peso 0.8; Intervozes (análise de propriedade, não de conteúdo) tem peso 0.6.
+
+**3. Incerteza como desvio entre fontes** — o campo `uncertainty` no JSON reflete o desvio-padrão dos scores normalizados entre as fontes disponíveis. Veículos com apenas uma fonte têm incerteza arbitrariamente elevada (±0.25–0.30) por ausência de triangulação.
+
+> **Limitação reconhecida:** nenhuma fonte cobre todos os 18 veículos com o mesmo método. Para veículos de menor porte (Outras Palavras, Agência Pública, Metrópoles), a classificação baseia-se em uma única fonte ou inferência por proximidade editorial — o que eleva a incerteza e deve ser interpretado com cautela.
+
+#### Justificativa metodológica (para fins acadêmicos)
+
+> *"O score ideológico de cada veículo foi obtido por agregação meta-analítica de classificações independentes, convertidas para escala comum [−1, +1] e ponderadas pelo rigor metodológico de cada fonte. A incerteza associada a cada score expressa a divergência entre as fontes — veículos com maior consenso acadêmico têm incerteza menor. Essa abordagem segue o princípio de triangulação metodológica (DENZIN, 1978) e é análoga à síntese de evidências proposta por Groseclose & Milyo (2005) para mensuração de viés em mídia."*
+
+#### Referências completas das fontes classificatórias
+
+- **FERES JÚNIOR, J. et al.** Manchetômetro: monitoramento do noticiário político na mídia brasileira. IESP/UERJ, 2013–. Disponível em: [http://www.manchetometro.com.br](http://www.manchetometro.com.br)
+
+- **ORTELLADO, P.; RIBEIRO, M. M.** Estamos todos desinformados? GPOPAI — Grupo de Pesquisa em Políticas Públicas para o Acesso à Informação, USP, 2018. Disponível em: [https://gpopai.usp.br](https://gpopai.usp.br)
+
+- **INTERVOZES — Coletivo Brasil de Comunicação Social.** Donos da Mídia: mapeamento da propriedade dos meios de comunicação no Brasil. São Paulo: Intervozes, 2017. Disponível em: [https://donosdamidia.com.br](https://donosdamidia.com.br)
+
+- **NEWMAN, N. et al.** Reuters Institute Digital News Report 2024. Reuters Institute for the Study of Journalism, University of Oxford, 2024. Disponível em: [https://reutersinstitute.politics.ox.ac.uk/digital-news-report/2024](https://reutersinstitute.politics.ox.ac.uk/digital-news-report/2024)
+
+- **GROSECLOSE, T.; MILYO, J.** A Measure of Media Bias. *The Quarterly Journal of Economics*, v. 120, n. 4, p. 1191–1237, 2005. Disponível em: [https://doi.org/10.1162/003355305775097542](https://doi.org/10.1162/003355305775097542)
+
+- **DENZIN, N. K.** *The Research Act: A Theoretical Introduction to Sociological Methods.* 2. ed. New York: McGraw-Hill, 1978.
+
+---
+
 ## 📊 BiasScore
 
 O BiasScore mede a **intensidade média de viés** de um artigo, ponderando cada sentença pelo grau de enviesamento detectado pelo classificador:

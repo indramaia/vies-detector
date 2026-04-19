@@ -36,13 +36,21 @@ from aggregation import VehicleIndex
 
 app = Flask(__name__)
 
-_cors_origins = os.getenv("CORS_ORIGINS", "*")
-CORS(app, resources={r"/api/*": {"origins": [
-    "https://biasradar.lovable.app",
-    "https://*.lovable.app",
-    "http://localhost:3000",
-    "http://localhost:5173",
-]}})
+def _is_allowed_origin(origin: str) -> bool:
+    if not origin:
+        return False
+    allowed = [
+        "https://biasradar.lovable.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ]
+    if origin in allowed:
+        return True
+    if origin.startswith("https://") and origin.endswith(".lovable.app"):
+        return True
+    return False
+
+CORS(app, resources={r"/api/*": {"origins": _is_allowed_origin}})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

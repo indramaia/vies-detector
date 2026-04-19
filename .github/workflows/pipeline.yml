@@ -2,7 +2,7 @@ name: Pipeline - Coleta e Classificação
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # a cada 6 horas
+    - cron: '0 */12 * * *'    # a cada 12 horas
   workflow_dispatch:          # permite rodar manualmente
 
 jobs:

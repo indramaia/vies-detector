@@ -49,6 +49,71 @@ SOURCES: list[NewsSource] = [
         url="https://www.cartacapital.com.br/feed/",
         ideology_id="cartacapital",
     ),
+    NewsSource(
+        name="G1",
+        url="https://g1.globo.com/rss/g1/",
+        ideology_id="g1",
+    ),
+    NewsSource(
+        name="UOL Notícias",
+        url="https://rss.uol.com.br/feed/noticias.xml",
+        ideology_id="uol",
+    ),
+    NewsSource(
+        name="CNN Brasil",
+        url="https://www.cnnbrasil.com.br/feed/",
+        ideology_id="cnnbrasil",
+    ),
+    NewsSource(
+        name="Veja",
+        url="https://veja.abril.com.br/feed/",
+        ideology_id="veja",
+    ),
+    NewsSource(
+        name="Agência Brasil",
+        url="https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml",
+        ideology_id="agenciabrasil",
+    ),
+    NewsSource(
+        name="R7",
+        url="https://noticias.r7.com/feed.xml",
+        ideology_id="r7",
+    ),
+    NewsSource(
+        name="El País Brasil",
+        url="https://brasil.elpais.com/rss/brasil/portada_completa.xml",
+        ideology_id="elpais",
+    ),
+    NewsSource(
+        name="Metrópoles",
+        url="https://www.metropoles.com/feed",
+        ideology_id="metropoles",
+    ),
+    NewsSource(
+        name="Brasil de Fato",
+        url="https://www.brasildefato.com.br/rss.xml",
+        ideology_id="brasildefato",
+    ),
+    NewsSource(
+        name="The Intercept Brasil",
+        url="https://theintercept.com/brasil/feed/",
+        ideology_id="intercept",
+    ),
+    NewsSource(
+        name="Agência Pública",
+        url="https://apublica.org/feed/",
+        ideology_id="agenciapublica",
+    ),
+    NewsSource(
+        name="Le Monde Diplomatique Brasil",
+        url="https://diplomatique.org.br/feed/",
+        ideology_id="lemonde",
+    ),
+    NewsSource(
+        name="Outras Palavras",
+        url="https://outraspalavras.net/feed/",
+        ideology_id="outraspalavras",
+    ),
 ]
 
 ACTIVE_SOURCES: list[NewsSource] = [s for s in SOURCES if s.active]
