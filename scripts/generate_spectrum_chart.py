@@ -11,7 +11,6 @@ Uso:
 import json
 from pathlib import Path
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import numpy as np
 
 # ── Caminhos ──────────────────────────────────────────────────────────────────
@@ -126,11 +125,6 @@ ax.set_title(
     fontsize=10, fontweight="bold", pad=14,
 )
 
-# Legenda — cores (posição)
-legend_pos = [
-    mpatches.Patch(color=c, label=l)
-    for l, c in COLOR_MAP.items()
-]
 # Legenda — marcadores (base de classificação)
 from matplotlib.lines import Line2D
 legend_basis = [
@@ -139,18 +133,10 @@ legend_basis = [
     Line2D([0], [0], marker="^", color="w", markerfacecolor="#555", markersize=8, label="Inferência editorial"),
 ]
 
-leg1 = ax.legend(
-    handles=legend_pos,
-    loc="lower right",
-    bbox_to_anchor=(1.0, 0.0),
-    fontsize=8, title="Posição", title_fontsize=8,
-    framealpha=0.9,
-)
-ax.add_artist(leg1)
 ax.legend(
     handles=legend_basis,
     loc="lower right",
-    bbox_to_anchor=(1.0, 0.22),
+    bbox_to_anchor=(1.0, 0.0),
     fontsize=8, title="Base de classificação", title_fontsize=8,
     framealpha=0.9,
 )
