@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: vies-detector-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn api.app:app
+    healthCheckPath: /api/health
+    buildFilter:
+      paths:
+        - api/**
+        - scripts/setup_db.py
+        - aggregation/**
+        - ideological/**
+        - requirements.txt
+        - Procfile
+        - render.yaml
+      ignoredPaths:
+        - "README.md"
+        - "docs/**"
+        - "*.md"
+        - "scripts/generate_spectrum_chart.py"
+        - ".github/**"
+        - "classifier/**"
+        - "collector/**"
+        - "pipeline/**"

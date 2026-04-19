@@ -29,12 +29,22 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///vies_detector.db")
-engine = create_engine(
-    os.environ["DATABASE_URL"],
-    use_insertmanyvalues=False,
-    implicit_returning=False,
-)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+_engine = None
+_SessionLocal = None
+
+def _get_engine():
+    """Cria o engine apenas na primeira chamada real (lazy init).
+    Evita que o Neon acorde ao subir o Flask/gunicorn sem requests reais."""
+    global _engine, _SessionLocal
+    if _engine is None:
+        _engine = create_engine(
+            os.environ["DATABASE_URL"],
+            use_insertmanyvalues=False,
+            implicit_returning=False,
+        )
+        _SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+    return _engine, _SessionLocal
 
 
 class Base(DeclarativeBase):
@@ -112,6 +122,7 @@ class VehicleIndexRecord(Base):
 
 def init_db() -> None:
     """Cria todas as tabelas se não existirem."""
+    engine, _ = _get_engine()
     Base.metadata.create_all(bind=engine)
     logger.info(f"Banco de dados inicializado: {DATABASE_URL}")
 
@@ -119,6 +130,7 @@ def init_db() -> None:
 @contextmanager
 def get_session():
     """Context manager que garante commit/rollback e fechamento da sessão."""
+    _, SessionLocal = _get_engine()
     session: Session = SessionLocal()
     try:
         yield session

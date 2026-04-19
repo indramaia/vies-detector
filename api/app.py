@@ -139,6 +139,7 @@ def stats():
 
 @app.get("/api/health")
 def health():
+    # Não toca no banco — permite que o Render faça health check sem acordar o Neon
     return jsonify({"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()})
 
 
