@@ -22,9 +22,23 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          huggingface-cli download IndraSeixas/bertimbau-bias \
-            --local-dir models/bertimbau-bias \
-            --token $HF_TOKEN
+          python -c "
+          import os, sys
+          token = os.environ.get('HF_TOKEN', '')
+          if not token:
+              print('ERRO: HF_TOKEN nao configurado nos secrets do GitHub')
+              sys.exit(1)
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              repo_id='IndraSeixas/bertimbau-bias',
+              local_dir='models/bertimbau-bias',
+              token=token,
+          )
+          print('Modelo baixado com sucesso.')
+          "
+
+      - name: Verificar modelo baixado
+        run: ls -lh models/bertimbau-bias/
 
       - name: Rodar pipeline
         env:
