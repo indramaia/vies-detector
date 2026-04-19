@@ -72,5 +72,157 @@
         "ORTELLADO; RIBEIRO, 2018 — classificação: esquerda"
       ]
     }
+    ,
+    "g1": {
+      "name": "G1",
+      "url": "https://g1.globo.com",
+      "ideology_score": 0.15,
+      "uncertainty": 0.2,
+      "position_label": "Centro",
+      "description": "Portal de notícias do Grupo Globo, maior conglomerado de mídia do Brasil. Linha editorial de centro com ampla cobertura nacional.",
+      "academic_refs": [
+        "INTERVOZES, 2017 — grupo Globo controla ~73% da audiência televisiva",
+        "REUTERS INSTITUTE, 2024 — G1 entre os portais mais acessados do Brasil"
+      ]
+    },
+    "uol": {
+      "name": "UOL Notícias",
+      "url": "https://noticias.uol.com.br",
+      "ideology_score": 0.05,
+      "uncertainty": 0.25,
+      "position_label": "Centro",
+      "description": "Maior portal de internet do Brasil (Grupo Folha). Agrega conteúdo de múltiplas fontes com linha editorial de centro.",
+      "academic_refs": [
+        "REUTERS INSTITUTE, 2024 — UOL entre os portais de maior alcance no Brasil"
+      ]
+    },
+    "cnnbrasil": {
+      "name": "CNN Brasil",
+      "url": "https://www.cnnbrasil.com.br",
+      "ideology_score": 0.2,
+      "uncertainty": 0.2,
+      "position_label": "Centro",
+      "description": "Canal de notícias 24h lançado em 2020, licenciado da CNN Internacional. Linha editorial de centro com ênfase em economia e política.",
+      "academic_refs": [
+        "REUTERS INSTITUTE, 2024 — CNN Brasil em crescimento de audiência"
+      ]
+    },
+    "veja": {
+      "name": "Veja",
+      "url": "https://veja.abril.com.br",
+      "ideology_score": 0.45,
+      "uncertainty": 0.2,
+      "position_label": "Centro-direita",
+      "description": "Maior revista semanal de informação do Brasil (Grupo Abril). Historicamente posicionada à centro-direita com cobertura crítica de governos de esquerda.",
+      "academic_refs": [
+        "FERES JÚNIOR et al., 2013 — classificação: centro-direita",
+        "ORTELLADO; RIBEIRO, 2018 — classificação: direita"
+      ]
+    },
+    "agenciabrasil": {
+      "name": "Agência Brasil",
+      "url": "https://agenciabrasil.ebc.com.br",
+      "ideology_score": -0.15,
+      "uncertainty": 0.2,
+      "position_label": "Centro",
+      "description": "Agência pública de notícias da EBC (Empresa Brasil de Comunicação). Cobertura institucional com ênfase em políticas públicas e direitos sociais.",
+      "academic_refs": [
+        "INTERVOZES, 2017 — EBC como veículo público federal"
+      ]
+    },
+    "r7": {
+      "name": "R7",
+      "url": "https://noticias.r7.com",
+      "ideology_score": 0.4,
+      "uncertainty": 0.2,
+      "position_label": "Centro-direita",
+      "description": "Portal de notícias da Record TV (Grupo Record), pertencente a Edir Macedo. Linha editorial de centro-direita com ênfase em segurança pública e valores conservadores.",
+      "academic_refs": [
+        "INTERVOZES, 2017 — Record TV como segundo maior grupo de TV do Brasil",
+        "ORTELLADO; RIBEIRO, 2018 — classificação: centro-direita"
+      ]
+    },
+    "elpais": {
+      "name": "El País Brasil",
+      "url": "https://brasil.elpais.com",
+      "ideology_score": -0.25,
+      "uncertainty": 0.2,
+      "position_label": "Centro-esquerda",
+      "description": "Edição brasileira do jornal espanhol El País. Linha editorial progressista com cobertura de qualidade em política, cultura e direitos humanos.",
+      "academic_refs": [
+        "REUTERS INSTITUTE, 2024 — El País Brasil em crescimento de audiência digital"
+      ]
+    },
+    "metropoles": {
+      "name": "Metrópoles",
+      "url": "https://www.metropoles.com",
+      "ideology_score": 0.1,
+      "uncertainty": 0.3,
+      "position_label": "Centro",
+      "description": "Portal digital nativo de Brasília com grande alcance nacional. Cobertura ampla de política, entretenimento e cotidiano.",
+      "academic_refs": [
+        "REUTERS INSTITUTE, 2024 — Metrópoles entre os portais nativos digitais de maior crescimento"
+      ]
+    },
+    "brasildefato": {
+      "name": "Brasil de Fato",
+      "url": "https://www.brasildefato.com.br",
+      "ideology_score": -0.80,
+      "uncertainty": 0.1,
+      "position_label": "Esquerda",
+      "description": "Veículo de comunicação popular vinculado a movimentos sociais (MST, CUT). Cobertura explicitamente progressista com foco em direitos humanos, reforma agrária e movimentos populares.",
+      "academic_refs": [
+        "ORTELLADO; RIBEIRO, 2018 — classificação: esquerda",
+        "INTERVOZES, 2017 — mídia alternativa e movimentos sociais"
+      ]
+    },
+    "intercept": {
+      "name": "The Intercept Brasil",
+      "url": "https://theintercept.com/brasil",
+      "ideology_score": -0.60,
+      "uncertainty": 0.15,
+      "position_label": "Esquerda",
+      "description": "Braço brasileiro do veículo de jornalismo investigativo fundado por Glenn Greenwald. Foco em denúncias, vigilância estatal e crítica ao poder econômico e político.",
+      "academic_refs": [
+        "REUTERS INSTITUTE, 2024 — The Intercept Brasil classificado como veículo de esquerda investigativa",
+        "ORTELLADO; RIBEIRO, 2018 — veículos nativos digitais progressistas"
+      ]
+    },
+    "agenciapublica": {
+      "name": "Agência Pública",
+      "url": "https://apublica.org",
+      "ideology_score": -0.45,
+      "uncertainty": 0.2,
+      "position_label": "Centro-esquerda",
+      "description": "Primeira agência sem fins lucrativos de jornalismo investigativo do Brasil. Cobertura com enfoque em direitos humanos, meio ambiente e transparência pública.",
+      "academic_refs": [
+        "REUTERS INSTITUTE, 2024 — jornalismo investigativo independente",
+        "ORTELLADO; RIBEIRO, 2018 — veículos progressistas independentes"
+      ]
+    },
+    "lemonde": {
+      "name": "Le Monde Diplomatique Brasil",
+      "url": "https://diplomatique.org.br",
+      "ideology_score": -0.65,
+      "uncertainty": 0.15,
+      "position_label": "Esquerda",
+      "description": "Edição brasileira do Le Monde Diplomatique francês. Análise política e econômica de viés crítico ao capitalismo, com ênfase em geopolítica e movimentos sociais.",
+      "academic_refs": [
+        "ORTELLADO; RIBEIRO, 2018 — classificação: esquerda",
+        "FERES JÚNIOR et al., 2013 — publicações de análise política progressista"
+      ]
+    },
+    "outraspalavras": {
+      "name": "Outras Palavras",
+      "url": "https://outraspalavras.net",
+      "ideology_score": -0.75,
+      "uncertainty": 0.15,
+      "position_label": "Esquerda",
+      "description": "Plataforma de jornalismo colaborativo progressista. Foco em economia solidária, ecologia política, direitos humanos e alternativas ao modelo econômico dominante.",
+      "academic_refs": [
+        "ORTELLADO; RIBEIRO, 2018 — mídia alternativa de esquerda",
+        "INTERVOZES, 2017 — veículos alternativos e contra-hegemônicos"
+      ]
+    }
   }
 }
