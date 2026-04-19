@@ -214,7 +214,11 @@ def fetch_feed(
         return []
 
     if feed.bozo:
-        logger.warning(f"[{source.name}] Feed malformado: {feed.bozo_exception}")
+        bozo_msg = str(feed.bozo_exception)
+        if "declared as" in bozo_msg and "parsed as" in bozo_msg:
+            logger.debug(f"[{source.name}] Encoding declarado diferente do real (inofensivo): {bozo_msg}")
+        else:
+            logger.warning(f"[{source.name}] Feed malformado: {bozo_msg}")
 
     articles: list[ArticleData] = []
     fallback_count = 0
