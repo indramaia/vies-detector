@@ -18,6 +18,19 @@ jobs:
       - name: Instalar dependências
         run: pip install -r requirements.txt
 
+      - name: Baixar modelo do HuggingFace Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python - <<'EOF'
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              repo_id="IndraSeixas/bertimbau-bias",
+              local_dir="models/bertimbau-bias",
+              token="${{ secrets.HF_TOKEN }}",
+          )
+          EOF
+
       - name: Rodar pipeline
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
