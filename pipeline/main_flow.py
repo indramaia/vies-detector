@@ -42,8 +42,9 @@ def task_collect(db_session) -> list[ArticleData]:
     existing_hashes = {row.url_hash for row in db_session.query(ArticleRecord.url_hash).all()}
     logger.info(f"Hashes já registrados no banco: {len(existing_hashes)}")
 
-    dedup = Deduplicator(backend=existing_hashes)
+    dedup    = Deduplicator(backend=existing_hashes)
     articles = fetch_all_feeds(dedup)
+    
     logger.info(f"Artigos novos coletados: {len(articles)}")
     return articles
 
@@ -101,6 +102,7 @@ def task_persist(
             n_factual=bias.n_factual if bias else None,
             n_biased=bias.n_biased if bias else None,
             n_strongly_biased=bias.n_strongly_biased if bias else None,
+            image_url=extract_og_image(soup, url)
         )
         db_session.add(article_rec)
 

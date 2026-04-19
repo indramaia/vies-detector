@@ -29,18 +29,20 @@ from flask import Flask, jsonify, request, abort
 from flask_cors import CORS
 from loguru import logger
 
-from scripts.setup_db import get_session, VehicleIndexRecord, ArticleRecord
+from sqlalchemy import func
+from scripts.setup_db import get_session, VehicleIndexRecord, ArticleRecord, SentenceRecord
 from ideological import get_spectrum_summary, contextualize_all
 from aggregation import VehicleIndex
 
 app = Flask(__name__)
 
 _cors_origins = os.getenv("CORS_ORIGINS", "*")
-CORS(app, origins=[
+CORS(app, resources={r"/api/*": {"origins": [
     "https://biasradar.lovable.app",
-    "https://id-preview--587bd150-dcce-40ab-aa7c-1c07eed8c13a.lovable.app",
-    "http://localhost:*"
-])
+    "https://*.lovable.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+]}})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -105,6 +107,27 @@ def server_error(e):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/stats")
+def stats():
+    """Retorna totais gerais para a landing page."""
+    with get_session() as session:
+        total_articles = session.query(func.count(ArticleRecord.url_hash)).scalar() or 0
+        total_sentences = session.query(func.count(SentenceRecord.id)).scalar() or 0
+        total_vehicles = session.query(func.count(func.distinct(ArticleRecord.ideology_id))).scalar() or 0
+        last_updated = session.query(func.max(ArticleRecord.published_at)).scalar()
+
+    return jsonify({
+        "total_articles": total_articles,
+        "total_sentences": total_sentences,
+        "total_vehicles": total_vehicles,
+        "last_updated": (
+            last_updated.isoformat()
+            if hasattr(last_updated, "isoformat")
+            else last_updated
+        ) if last_updated else None,
+    })
+
 
 @app.get("/api/health")
 def health():
