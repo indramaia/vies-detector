@@ -151,19 +151,23 @@ def cluster_articles(
             spectrum = _POSITION_MAP.get(art.ideology_id, "Centro")
             spectrum_counts[spectrum] += 1
             articles_out.append({
-                "url_hash":    art.url_hash,
-                "title":       art.title,
-                "url":         art.url,
-                "source_name": art.source_name,
-                "ideology_id": art.ideology_id,
-                "spectrum":    spectrum,
-                "bias_score":  art.bias_score,
+                "url_hash":            art.url_hash,
+                "title":               art.title,
+                "url":                 art.url,
+                "source_name":         art.source_name,
+                "ideology_id":         art.ideology_id,
+                "spectrum":            spectrum,
+                "bias_score":          art.bias_score,
                 "bias_interpretation": art.bias_interpretation,
+                "sentence_count":      art.sentence_count,
+                "n_factual":           art.n_factual,
+                "n_biased":            art.n_biased,
+                "n_strongly_biased":   art.n_strongly_biased,
                 "published_at": (
                     art.published_at.isoformat()
                     if art.published_at else None
                 ),
-                "image_url":   art.image_url,
+                "image_url":           art.image_url,
             })
 
         stories.append({
