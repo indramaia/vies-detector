@@ -222,6 +222,7 @@ def fetch_feed(
 
     articles: list[ArticleData] = []
     fallback_count = 0
+    duplicate_count = 0
 
     for entry in feed.entries:
         url = getattr(entry, "link", None)
@@ -229,7 +230,7 @@ def fetch_feed(
             continue
 
         if deduplicator.is_duplicate(url):
-            logger.debug(f"[{source.name}] Duplicata ignorada: {url}")
+            duplicate_count += 1
             continue
 
         url_hash = deduplicator.register(url)
@@ -266,6 +267,8 @@ def fetch_feed(
         articles.append(article)
 
     time.sleep(request_delay)
+    if duplicate_count:
+        logger.debug(f"[{source.name}] {duplicate_count} duplicatas ignoradas.")
     logger.info(
         f"[{source.name}] {len(articles)} artigos novos coletados "
         f"({fallback_count} via fallback og:image)."
