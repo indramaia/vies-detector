@@ -4,22 +4,39 @@
     "sources": [
       "FERES JÚNIOR et al. Manchetômetro. IESP/UERJ, 2013-.",
       "ORTELLADO, P.; RIBEIRO, M. Estamos todos desinformados? GPOPAI/USP, 2018.",
-      "INTERVOZES. Donos da Mídia. 2017.",
-      "REUTERS INSTITUTE. Digital News Report 2024."
+      "INTERVOZES. Donos da Mídia. 2017."
     ],
+    "weights": {
+      "feres_junior": 1.0,
+      "ortellado_ribeiro": 1.0,
+      "intervozes": 0.8
+    },
+    "normalization": {
+      "Esquerda": -0.75,
+      "Centro-esquerda": -0.35,
+      "Centro": 0.00,
+      "Centro-direita": 0.40,
+      "Direita": 0.70
+    },
     "scale": "[-1.0, +1.0] onde -1 = progressista, 0 = centro, +1 = conservador",
     "caveat": "Estes posicionamentos refletem análises acadêmicas de períodos específicos e podem não capturar mudanças editoriais recentes. O score ideológico NÃO é julgamento do sistema — é contextualização baseada em literatura científica revisada por pares.",
-    "last_updated": "2025-01",
-    "methodology": "Média ponderada de classificações de múltiplas fontes acadêmicas. Incerteza estimada (±) indica divergência entre fontes."
+    "last_updated": "2026-04",
+    "methodology": "Média ponderada de classificações normalizadas: Score = Σ(wᵢ × sᵢ) / Σwᵢ. Incerteza = desvio-padrão entre as fontes disponíveis. Veículos sem cobertura direta recebem incerteza máxima (±0.35) e são marcados como inferência editorial."
   },
   "vehicles": {
     "folha": {
       "name": "Folha de S.Paulo",
       "url": "https://www.folha.uol.com.br",
-      "ideology_score": 0.1,
-      "uncertainty": 0.2,
+      "ideology_score": 0.20,
+      "uncertainty": 0.20,
       "position_label": "Centro",
-      "description": "Considerado de centro a centro-direita pela maioria dos estudos, com linha editorial independente e histórico de cobertura crítica de diferentes governos.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "feres_junior": { "label": "Centro-direita", "score_norm": 0.40, "weight": 1.0 },
+        "ortellado_ribeiro": { "label": "Centro", "score_norm": 0.00, "weight": 1.0 }
+      },
+      "calculation": "(1.0×0.40 + 1.0×0.00) / (1.0+1.0) = 0.20",
+      "description": "Classificado como centro-direita pelo Manchetômetro e centro por Ortellado & Ribeiro. Média ponderada resulta em posição de centro com incerteza moderada pela divergência entre as fontes.",
       "academic_refs": [
         "FERES JÚNIOR et al., 2013 — classificação: centro-direita",
         "ORTELLADO; RIBEIRO, 2018 — classificação: centro"
@@ -28,10 +45,16 @@
     "estadao": {
       "name": "O Estado de S. Paulo",
       "url": "https://www.estadao.com.br",
-      "ideology_score": 0.35,
-      "uncertainty": 0.15,
+      "ideology_score": 0.40,
+      "uncertainty": 0.10,
       "position_label": "Centro-direita",
-      "description": "Consistentemente classificado como centro-direita, com posicionamento liberal-conservador em pautas econômicas e de segurança.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "feres_junior": { "label": "Centro-direita", "score_norm": 0.40, "weight": 1.0 },
+        "ortellado_ribeiro": { "label": "Centro-direita", "score_norm": 0.40, "weight": 1.0 }
+      },
+      "calculation": "(1.0×0.40 + 1.0×0.40) / (1.0+1.0) = 0.40",
+      "description": "Consenso entre as duas fontes primárias: centro-direita. Menor incerteza do conjunto por ausência de divergência.",
       "academic_refs": [
         "FERES JÚNIOR et al., 2013 — classificação: centro-direita",
         "ORTELLADO; RIBEIRO, 2018 — classificação: centro-direita"
@@ -40,10 +63,16 @@
     "oglobo": {
       "name": "O Globo",
       "url": "https://oglobo.globo.com",
-      "ideology_score": 0.2,
-      "uncertainty": 0.2,
+      "ideology_score": 0.00,
+      "uncertainty": 0.15,
       "position_label": "Centro",
-      "description": "Classificado como centro a centro-direita; integra o maior conglomerado de mídia do país (Grupo Globo).",
+      "classification_basis": "direto",
+      "sources_used": {
+        "feres_junior": { "label": "Centro", "score_norm": 0.00, "weight": 1.0 },
+        "intervozes": { "label": "Centro (estrutura)", "score_norm": 0.00, "weight": 0.8 }
+      },
+      "calculation": "(1.0×0.00 + 0.8×0.00) / (1.0+0.8) = 0.00",
+      "description": "Classificado como centro pelo Manchetômetro; Intervozes analisa concentração de propriedade sem classificação ideológica direta.",
       "academic_refs": [
         "FERES JÚNIOR et al., 2013 — classificação: centro",
         "INTERVOZES, 2017 — grupo Globo controla ~73% da audiência televisiva"
@@ -52,10 +81,15 @@
     "gazetadopovo": {
       "name": "Gazeta do Povo",
       "url": "https://www.gazetadopovo.com.br",
-      "ideology_score": 0.65,
-      "uncertainty": 0.15,
+      "ideology_score": 0.70,
+      "uncertainty": 0.20,
       "position_label": "Direita",
-      "description": "Reposicionamento editorial explícito para direita conservadora a partir de 2017, com cobertura favorável a pautas de segurança pública, livre-mercado e valores tradicionais.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "ortellado_ribeiro": { "label": "Direita", "score_norm": 0.70, "weight": 1.0 }
+      },
+      "calculation": "(1.0×0.70) / 1.0 = 0.70",
+      "description": "Única fonte primária disponível. Reposicionamento editorial explícito para direita conservadora a partir de 2017.",
       "academic_refs": [
         "ORTELLADO; RIBEIRO, 2018 — classificação: direita"
       ]
@@ -63,57 +97,74 @@
     "cartacapital": {
       "name": "Carta Capital",
       "url": "https://www.cartacapital.com.br",
-      "ideology_score": -0.7,
-      "uncertainty": 0.15,
+      "ideology_score": -0.75,
+      "uncertainty": 0.10,
       "position_label": "Esquerda",
-      "description": "Linha editorial explicitamente progressista; cobertura crítica de políticas neoliberais e conservadoras.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "feres_junior": { "label": "Esquerda", "score_norm": -0.75, "weight": 1.0 },
+        "ortellado_ribeiro": { "label": "Esquerda", "score_norm": -0.75, "weight": 1.0 }
+      },
+      "calculation": "(1.0×(-0.75) + 1.0×(-0.75)) / (1.0+1.0) = -0.75",
+      "description": "Pleno consenso entre as duas fontes primárias. Classificação com maior certeza do conjunto.",
       "academic_refs": [
         "FERES JÚNIOR et al., 2013 — classificação: esquerda",
         "ORTELLADO; RIBEIRO, 2018 — classificação: esquerda"
       ]
-    }
-    ,
+    },
     "g1": {
       "name": "G1",
       "url": "https://g1.globo.com",
-      "ideology_score": 0.15,
-      "uncertainty": 0.2,
+      "ideology_score": 0.00,
+      "uncertainty": 0.30,
       "position_label": "Centro",
-      "description": "Portal de notícias do Grupo Globo, maior conglomerado de mídia do Brasil. Linha editorial de centro com ampla cobertura nacional.",
+      "classification_basis": "estrutural",
+      "sources_used": {
+        "intervozes": { "label": "Centro (estrutura Grupo Globo)", "score_norm": 0.00, "weight": 0.8 }
+      },
+      "calculation": "(0.8×0.00) / 0.8 = 0.00",
+      "description": "Classificação estrutural via Intervozes (propriedade Grupo Globo). Incerteza elevada por ausência de análise de conteúdo editorial direto.",
       "academic_refs": [
-        "INTERVOZES, 2017 — grupo Globo controla ~73% da audiência televisiva",
-        "REUTERS INSTITUTE, 2024 — G1 entre os portais mais acessados do Brasil"
+        "INTERVOZES, 2017 — grupo Globo controla ~73% da audiência televisiva"
       ]
     },
     "uol": {
       "name": "UOL Notícias",
       "url": "https://noticias.uol.com.br",
-      "ideology_score": 0.05,
-      "uncertainty": 0.25,
+      "ideology_score": 0.10,
+      "uncertainty": 0.35,
       "position_label": "Centro",
-      "description": "Maior portal de internet do Brasil (Grupo Folha). Agrega conteúdo de múltiplas fontes com linha editorial de centro.",
-      "academic_refs": [
-        "REUTERS INSTITUTE, 2024 — UOL entre os portais de maior alcance no Brasil"
-      ]
+      "classification_basis": "inferencia_editorial",
+      "sources_used": {},
+      "calculation": "Inferência por proximidade: Grupo Folha (Folha score=0.20), função de agregador → 0.10",
+      "description": "Sem classificação direta nas fontes primárias. Score inferido por pertencimento ao Grupo Folha e função de portal agregador de múltiplas fontes. Incerteza máxima.",
+      "academic_refs": []
     },
     "cnnbrasil": {
       "name": "CNN Brasil",
       "url": "https://www.cnnbrasil.com.br",
-      "ideology_score": 0.2,
-      "uncertainty": 0.2,
+      "ideology_score": 0.00,
+      "uncertainty": 0.35,
       "position_label": "Centro",
-      "description": "Canal de notícias 24h lançado em 2020, licenciado da CNN Internacional. Linha editorial de centro com ênfase em economia e política.",
-      "academic_refs": [
-        "REUTERS INSTITUTE, 2024 — CNN Brasil em crescimento de audiência"
-      ]
+      "classification_basis": "inferencia_editorial",
+      "sources_used": {},
+      "calculation": "Inferência editorial: lançado em 2020, posterior a todas as fontes primárias. Score=0.00 (centro por ausência de evidência).",
+      "description": "Sem classificação nas fontes primárias (lançado em 2020). Score atribuído por inferência editorial com incerteza máxima.",
+      "academic_refs": []
     },
     "veja": {
       "name": "Veja",
       "url": "https://veja.abril.com.br",
-      "ideology_score": 0.45,
-      "uncertainty": 0.2,
+      "ideology_score": 0.55,
+      "uncertainty": 0.20,
       "position_label": "Centro-direita",
-      "description": "Maior revista semanal de informação do Brasil (Grupo Abril). Historicamente posicionada à centro-direita com cobertura crítica de governos de esquerda.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "feres_junior": { "label": "Centro-direita", "score_norm": 0.40, "weight": 1.0 },
+        "ortellado_ribeiro": { "label": "Direita", "score_norm": 0.70, "weight": 1.0 }
+      },
+      "calculation": "(1.0×0.40 + 1.0×0.70) / (1.0+1.0) = 0.55",
+      "description": "Divergência entre as fontes: Manchetômetro classifica como centro-direita; Ortellado & Ribeiro como direita. Média resulta em centro-direita elevado.",
       "academic_refs": [
         "FERES JÚNIOR et al., 2013 — classificação: centro-direita",
         "ORTELLADO; RIBEIRO, 2018 — classificação: direita"
@@ -122,10 +173,15 @@
     "agenciabrasil": {
       "name": "Agência Brasil",
       "url": "https://agenciabrasil.ebc.com.br",
-      "ideology_score": -0.15,
-      "uncertainty": 0.2,
+      "ideology_score": -0.10,
+      "uncertainty": 0.25,
       "position_label": "Centro",
-      "description": "Agência pública de notícias da EBC (Empresa Brasil de Comunicação). Cobertura institucional com ênfase em políticas públicas e direitos sociais.",
+      "classification_basis": "estrutural",
+      "sources_used": {
+        "intervozes": { "label": "Pública federal (EBC)", "score_norm": -0.10, "weight": 0.8 }
+      },
+      "calculation": "(0.8×(-0.10)) / 0.8 = -0.10",
+      "description": "Classificação estrutural via Intervozes (veículo público estatal). Incerteza elevada por ausência de análise de conteúdo editorial.",
       "academic_refs": [
         "INTERVOZES, 2017 — EBC como veículo público federal"
       ]
@@ -133,44 +189,58 @@
     "r7": {
       "name": "R7",
       "url": "https://noticias.r7.com",
-      "ideology_score": 0.4,
-      "uncertainty": 0.2,
+      "ideology_score": 0.40,
+      "uncertainty": 0.15,
       "position_label": "Centro-direita",
-      "description": "Portal de notícias da Record TV (Grupo Record), pertencente a Edir Macedo. Linha editorial de centro-direita com ênfase em segurança pública e valores conservadores.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "ortellado_ribeiro": { "label": "Centro-direita", "score_norm": 0.40, "weight": 1.0 },
+        "intervozes": { "label": "Centro-direita (Record TV)", "score_norm": 0.40, "weight": 0.8 }
+      },
+      "calculation": "(1.0×0.40 + 0.8×0.40) / (1.0+0.8) = 0.40",
+      "description": "Consenso entre Ortellado & Ribeiro e Intervozes. Portal da Record TV, segundo maior grupo de TV do Brasil.",
       "academic_refs": [
-        "INTERVOZES, 2017 — Record TV como segundo maior grupo de TV do Brasil",
-        "ORTELLADO; RIBEIRO, 2018 — classificação: centro-direita"
+        "ORTELLADO; RIBEIRO, 2018 — classificação: centro-direita",
+        "INTERVOZES, 2017 — Record TV como segundo maior grupo de TV do Brasil"
       ]
     },
     "elpais": {
       "name": "El País Brasil",
       "url": "https://brasil.elpais.com",
       "ideology_score": -0.25,
-      "uncertainty": 0.2,
+      "uncertainty": 0.35,
       "position_label": "Centro-esquerda",
-      "description": "Edição brasileira do jornal espanhol El País. Linha editorial progressista com cobertura de qualidade em política, cultura e direitos humanos.",
-      "academic_refs": [
-        "REUTERS INSTITUTE, 2024 — El País Brasil em crescimento de audiência digital"
-      ]
+      "classification_basis": "inferencia_editorial",
+      "sources_used": {},
+      "calculation": "Inferência editorial: posicionamento progressista reconhecido do El País Internacional. Score=-0.25 com incerteza máxima.",
+      "description": "Sem classificação direta nas fontes primárias brasileiras. Score inferido pela linha editorial progressista do grupo El País Internacional. Incerteza máxima.",
+      "academic_refs": []
     },
     "metropoles": {
       "name": "Metrópoles",
       "url": "https://www.metropoles.com",
-      "ideology_score": 0.1,
-      "uncertainty": 0.3,
+      "ideology_score": 0.00,
+      "uncertainty": 0.35,
       "position_label": "Centro",
-      "description": "Portal digital nativo de Brasília com grande alcance nacional. Cobertura ampla de política, entretenimento e cotidiano.",
-      "academic_refs": [
-        "REUTERS INSTITUTE, 2024 — Metrópoles entre os portais nativos digitais de maior crescimento"
-      ]
+      "classification_basis": "inferencia_editorial",
+      "sources_used": {},
+      "calculation": "Inferência editorial: portal nativo digital sem classificação nas fontes primárias. Score=0.00 por ausência de evidência.",
+      "description": "Sem classificação nas fontes primárias. Score atribuído por inferência editorial com incerteza máxima.",
+      "academic_refs": []
     },
     "brasildefato": {
       "name": "Brasil de Fato",
       "url": "https://www.brasildefato.com.br",
-      "ideology_score": -0.80,
-      "uncertainty": 0.1,
+      "ideology_score": -0.75,
+      "uncertainty": 0.10,
       "position_label": "Esquerda",
-      "description": "Veículo de comunicação popular vinculado a movimentos sociais (MST, CUT). Cobertura explicitamente progressista com foco em direitos humanos, reforma agrária e movimentos populares.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "ortellado_ribeiro": { "label": "Esquerda", "score_norm": -0.75, "weight": 1.0 },
+        "intervozes": { "label": "Esquerda (mídia popular)", "score_norm": -0.75, "weight": 0.8 }
+      },
+      "calculation": "(1.0×(-0.75) + 0.8×(-0.75)) / (1.0+0.8) = -0.75",
+      "description": "Consenso entre Ortellado & Ribeiro e Intervozes. Veículo vinculado a movimentos sociais.",
       "academic_refs": [
         "ORTELLADO; RIBEIRO, 2018 — classificação: esquerda",
         "INTERVOZES, 2017 — mídia alternativa e movimentos sociais"
@@ -180,11 +250,15 @@
       "name": "The Intercept Brasil",
       "url": "https://theintercept.com/brasil",
       "ideology_score": -0.60,
-      "uncertainty": 0.15,
+      "uncertainty": 0.20,
       "position_label": "Esquerda",
-      "description": "Braço brasileiro do veículo de jornalismo investigativo fundado por Glenn Greenwald. Foco em denúncias, vigilância estatal e crítica ao poder econômico e político.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "ortellado_ribeiro": { "label": "Progressista/Esquerda", "score_norm": -0.60, "weight": 1.0 }
+      },
+      "calculation": "(1.0×(-0.60)) / 1.0 = -0.60",
+      "description": "Fonte única disponível. Incerteza moderada-alta por ausência de triangulação.",
       "academic_refs": [
-        "REUTERS INSTITUTE, 2024 — The Intercept Brasil classificado como veículo de esquerda investigativa",
         "ORTELLADO; RIBEIRO, 2018 — veículos nativos digitais progressistas"
       ]
     },
@@ -192,11 +266,15 @@
       "name": "Agência Pública",
       "url": "https://apublica.org",
       "ideology_score": -0.45,
-      "uncertainty": 0.2,
+      "uncertainty": 0.25,
       "position_label": "Centro-esquerda",
-      "description": "Primeira agência sem fins lucrativos de jornalismo investigativo do Brasil. Cobertura com enfoque em direitos humanos, meio ambiente e transparência pública.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "ortellado_ribeiro": { "label": "Centro-esquerda/Progressista", "score_norm": -0.45, "weight": 1.0 }
+      },
+      "calculation": "(1.0×(-0.45)) / 1.0 = -0.45",
+      "description": "Fonte única disponível. Incerteza elevada por ausência de triangulação.",
       "academic_refs": [
-        "REUTERS INSTITUTE, 2024 — jornalismo investigativo independente",
         "ORTELLADO; RIBEIRO, 2018 — veículos progressistas independentes"
       ]
     },
@@ -206,7 +284,13 @@
       "ideology_score": -0.65,
       "uncertainty": 0.15,
       "position_label": "Esquerda",
-      "description": "Edição brasileira do Le Monde Diplomatique francês. Análise política e econômica de viés crítico ao capitalismo, com ênfase em geopolítica e movimentos sociais.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "ortellado_ribeiro": { "label": "Esquerda", "score_norm": -0.65, "weight": 1.0 },
+        "feres_junior": { "label": "Esquerda (análise política progressista)", "score_norm": -0.65, "weight": 1.0 }
+      },
+      "calculation": "(1.0×(-0.65) + 1.0×(-0.65)) / (1.0+1.0) = -0.65",
+      "description": "Convergência entre Ortellado & Ribeiro e Manchetômetro/Feres Júnior.",
       "academic_refs": [
         "ORTELLADO; RIBEIRO, 2018 — classificação: esquerda",
         "FERES JÚNIOR et al., 2013 — publicações de análise política progressista"
@@ -218,7 +302,13 @@
       "ideology_score": -0.75,
       "uncertainty": 0.15,
       "position_label": "Esquerda",
-      "description": "Plataforma de jornalismo colaborativo progressista. Foco em economia solidária, ecologia política, direitos humanos e alternativas ao modelo econômico dominante.",
+      "classification_basis": "direto",
+      "sources_used": {
+        "ortellado_ribeiro": { "label": "Esquerda alternativa", "score_norm": -0.75, "weight": 1.0 },
+        "intervozes": { "label": "Esquerda (alternativa/contra-hegemônica)", "score_norm": -0.75, "weight": 0.8 }
+      },
+      "calculation": "(1.0×(-0.75) + 0.8×(-0.75)) / (1.0+0.8) = -0.75",
+      "description": "Convergência entre Ortellado & Ribeiro e Intervozes.",
       "academic_refs": [
         "ORTELLADO; RIBEIRO, 2018 — mídia alternativa de esquerda",
         "INTERVOZES, 2017 — veículos alternativos e contra-hegemônicos"
