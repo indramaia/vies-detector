@@ -255,13 +255,15 @@ def stories():
                 .order_by(ArticleRecord.published_at.desc())
                 .all()
             )
+            # cluster_articles deve ser chamado dentro do with — os objetos
+            # ArticleRecord ficam bound à sessão e podem ser lidos normalmente
+            result = cluster_articles(
+                records,
+                similarity_threshold=threshold,
+                min_sources=min_src,
+                max_stories=limit,
+            )
 
-        result = cluster_articles(
-            records,
-            similarity_threshold=threshold,
-            min_sources=min_src,
-            max_stories=limit,
-        )
         return jsonify({"stories": result, "ok": True, "error": None})
 
     except Exception as exc:
