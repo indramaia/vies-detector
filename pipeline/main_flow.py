@@ -177,9 +177,17 @@ def run_pipeline(window_days: int = 30) -> None:
     Pode ser agendado via Prefect:
         prefect deployment apply pipeline/deployment.yaml
     """
+    # Sessão 1: apenas busca hashes para deduplicação e fecha imediatamente.
+    # Não pode ser mantida aberta durante a classificação (BERTimbau leva minutos
+    # em CPU) — o Neon fecha SSL de conexões ociosas após ~5min.
     with get_session() as session:
         articles = task_collect(session)
-        bias_results = task_classify(articles)
+
+    # Classificação sem nenhuma conexão aberta.
+    bias_results = task_classify(articles)
+
+    # Sessão 2: conexão fresca, aberta só agora para INSERT + aggregation.
+    with get_session() as session:
         task_persist(articles, bias_results, session)
         task_aggregate_contextualize(bias_results, session, window_days)
 
