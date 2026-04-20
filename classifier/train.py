@@ -56,17 +56,17 @@ from .model_loader import LABEL2ID, ID2LABEL, NUM_LABELS, MAX_LENGTH
 
 
 # ── Hiperparâmetros (VARGAS et al., 2023; DEVLIN et al., 2019) ───────────────
-BASE_MODEL = "neuralmind/bert-base-portuguese-cased"
-#LEARNING_RATE = 2e-5            # original — convergência rápida, risco de overfitting
-LEARNING_RATE = 1e-5             # reduzido: aprende mais devagar, generaliza melhor
+BASE_MODEL                  = "neuralmind/bert-base-portuguese-cased"
+#LEARNING_RATE              = 2e-5  # original — convergência rápida, overfitting
+LEARNING_RATE               = 1e-5  # reduzido: aprende mais devagar, generalizou melhor
 PER_DEVICE_TRAIN_BATCH_SIZE = 8
-GRADIENT_ACCUMULATION_STEPS = 4  # batch efetivo = 32
-NUM_EPOCHS = 5
-WARMUP_RATIO = 0.1
-#WEIGHT_DECAY = 0.01             # original — regularização L2 fraca
-WEIGHT_DECAY = 0.1               # aumentado 10x: penaliza pesos grandes, reduz memorização
-#EARLY_STOPPING_PATIENCE = 2     # original — parava cedo demais na época 2
-EARLY_STOPPING_PATIENCE = 3      # aumentado: dá mais chance ao modelo antes de parar
+GRADIENT_ACCUMULATION_STEPS = 4     # batch efetivo = 32
+NUM_EPOCHS                  = 5
+WARMUP_RATIO                = 0.1
+#WEIGHT_DECAY               = 0.01  # original — regularização L2 fraca
+WEIGHT_DECAY                = 0.1   # aumentado 10x: penaliza pesos grandes, reduz memorização
+#EARLY_STOPPING_PATIENCE    = 2     # original — parava cedo demais na época 2
+EARLY_STOPPING_PATIENCE     = 3     # aumentado: dá mais chance ao modelo antes de parar
 
 # ── Pesos de classe — Camada 1: loss ponderada por frequência inversa ─────────
 # Distribuição FactNews (VARGAS et al., 2023): factual=4242, enviesada=558, fortemente=1391
@@ -84,8 +84,6 @@ CLASS_WEIGHTS = torch.tensor([
 
 # Variante suave (sqrt) — penaliza menos, preserva melhor as classes majoritárias
 # CLASS_WEIGHTS = torch.sqrt(CLASS_WEIGHTS)
-
-
 # ── Focal Loss — Camada 2 (alternativa à loss ponderada; comentada) ───────────
 # Desenhada para classes desbalanceadas em detecção (LIN et al., 2017).
 # Exemplos que o modelo já acerta com alta confiança contribuem pouco para a loss;
