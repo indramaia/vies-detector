@@ -102,7 +102,7 @@ def task_persist(
             n_factual=bias.n_factual if bias else None,
             n_biased=bias.n_biased if bias else None,
             n_strongly_biased=bias.n_strongly_biased if bias else None,
-            image_url=extract_og_image(soup, url)
+            image_url=art.image_url
         )
         db_session.add(article_rec)
 
