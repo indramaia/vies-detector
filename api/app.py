@@ -224,40 +224,50 @@ def stories():
     Agrupa artigos recentes de diferentes veículos sobre o mesmo assunto.
 
     Query params:
-        hours     : janela temporal em horas (padrão: 48, máx: 168)
-        limit     : número máximo de stories (padrão: 20, máx: 50)
-        threshold : similaridade TF-IDF mínima, float 0-1 (padrão: 0.25)
+        hours      : janela temporal em horas (padrão: 48, máx: 168)
+        limit      : número máximo de stories (padrão: 20, máx: 50)
+        threshold  : similaridade TF-IDF mínima, float 0-1 (padrão: 0.25)
         min_sources: mínimo de veículos distintos por story (padrão: 2)
 
-    Retorna lista de stories ordenadas por número de artigos (mais coberto primeiro).
-    Cada story contém: topic, article_count, left_count, center_count,
-    right_count, latest_at, articles[].
+    Retorna SEMPRE JSON válido — nunca 500 — para que o frontend
+    possa usar fallback para mock sem tratar exceções de rede distintas.
+    Em caso de erro retorna: {"stories": [], "ok": false, "error": "<msg>"}
+    Em caso de sucesso:       {"stories": [...], "ok": true,  "error": null}
     """
     from aggregation.topic_clusterer import cluster_articles
-
-    hours      = min(int(request.args.get("hours", 48)), 168)
-    limit      = min(int(request.args.get("limit", 20)), 50)
-    threshold  = float(request.args.get("threshold", 0.25))
-    min_src    = int(request.args.get("min_sources", 2))
-
     from datetime import timedelta
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
-    with get_session() as session:
-        records = (
-            session.query(ArticleRecord)
-            .filter(ArticleRecord.published_at >= cutoff)
-            .order_by(ArticleRecord.published_at.desc())
-            .all()
+    try:
+        hours     = min(int(request.args.get("hours",       48)),   168)
+        limit     = min(int(request.args.get("limit",       20)),    50)
+        threshold = float(request.args.get("threshold",     0.25))
+        min_src   = int(request.args.get("min_sources",     2))
+    except (ValueError, TypeError) as exc:
+        return jsonify({"stories": [], "ok": False, "error": f"Parâmetro inválido: {exc}"}), 400
+
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+        with get_session() as session:
+            records = (
+                session.query(ArticleRecord)
+                .filter(ArticleRecord.published_at >= cutoff)
+                .order_by(ArticleRecord.published_at.desc())
+                .all()
+            )
+
+        result = cluster_articles(
+            records,
+            similarity_threshold=threshold,
+            min_sources=min_src,
+            max_stories=limit,
         )
+        return jsonify({"stories": result, "ok": True, "error": None})
 
-    result = cluster_articles(
-        records,
-        similarity_threshold=threshold,
-        min_sources=min_src,
-        max_stories=limit,
-    )
-    return jsonify(result)
+    except Exception as exc:
+        logger.exception("Erro em /api/stories")
+        # Retorna 200 com lista vazia — o frontend usa o fallback sem crash
+        return jsonify({"stories": [], "ok": False, "error": str(exc)}), 200
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
