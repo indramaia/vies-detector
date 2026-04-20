@@ -42,10 +42,8 @@ def _get_engine():
             os.environ["DATABASE_URL"],
             use_insertmanyvalues=False,
             implicit_returning=False,
-            # a pipeline leva ~5 minutos classificando 438 artigos (12:36→12:41).
-            # Durante esse tempo a conexão fica idle no pool e o Neon fecha o SSL por timeout. Daí:
             pool_pre_ping=True,   # reconecta automaticamente se SSL cair durante idle
-            pool_recycle=280,     # descarta conexões após 4m40s (Neon fecha após ~5min idle)           
+            pool_recycle=280      # descarta conexões após 4m40s (Neon fecha após ~5min idle)           
         )
         _SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
     return _engine, _SessionLocal
