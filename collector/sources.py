@@ -114,6 +114,11 @@ SOURCES: list[NewsSource] = [
         url="https://outraspalavras.net/feed/",
         ideology_id="outraspalavras",
     ),
+    NewsSource(
+        name="Jovem Pan News",
+        url="https://jovempan.com.br/feed/",
+        ideology_id="jovempan",
+    ),
 ]
 
 ACTIVE_SOURCES: list[NewsSource] = [s for s in SOURCES if s.active]

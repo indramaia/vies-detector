@@ -313,6 +313,26 @@
         "ORTELLADO; RIBEIRO, 2018 — mídia alternativa de esquerda",
         "INTERVOZES, 2017 — veículos alternativos e contra-hegemônicos"
       ]
+    },
+    "jovempan": {
+      "name": "Jovem Pan News",
+      "url": "https://jovempan.com.br",
+      "ideology_score": 0.70,
+      "uncertainty": 0.10,
+      "position_label": "Direita",
+      "classification_basis": "direto",
+      "sources_used": {
+        "feres_junior": { "label": "Direita", "score_norm": 0.70, "weight": 1.0 },
+        "ortellado_ribeiro": { "label": "Direita", "score_norm": 0.70, "weight": 1.0 },
+        "intervozes": { "label": "Direita (Sistema Jovem Pan)", "score_norm": 0.70, "weight": 0.8 }
+      },
+      "calculation": "(1.0×0.70 + 1.0×0.70 + 0.8×0.70) / (1.0+1.0+0.8) = 1.96/2.8 = 0.70",
+      "description": "Pleno consenso entre as três fontes primárias: Direita. Manchetômetro e Ortellado & Ribeiro classificam diretamente a linha editorial conservadora; Intervozes aponta a concentração do Sistema Jovem Pan de Comunicação e sua posição político-editorial. Menor incerteza do conjunto por convergência total.",
+      "academic_refs": [
+        "FERES JÚNIOR et al., 2013 — classificação: direita (cobertura eleitoral conservadora)",
+        "ORTELLADO; RIBEIRO, 2018 — classificação: direita",
+        "INTERVOZES, 2017 — Sistema Jovem Pan de Comunicação: rádio, TV e portal com linha editorial conservadora"
+      ]
     }
   }
 }
