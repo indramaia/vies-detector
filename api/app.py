@@ -450,6 +450,10 @@ def stories():
         return jsonify(cached)
 
     try:
+        # Limite de artigos carregados em RAM para o TF-IDF.
+        # Render free tier tem 512 MB; acima de ~300 artigos com bigrams → OOM.
+        _MAX_ARTICLES_TFIDF = 300
+
         with get_session() as session:
             # Tenta a janela solicitada; se vazia, expande progressivamente até
             # encontrar artigos no DB — garante que dados históricos nunca sejam
@@ -463,11 +467,18 @@ def stories():
                     datetime.now(timezone.utc) - timedelta(hours=candidate_hours)
                     if candidate_hours is not None else None
                 )
-                q = session.query(ArticleRecord).order_by(ArticleRecord.published_at.desc())
+                q = (
+                    session.query(ArticleRecord)
+                    .order_by(ArticleRecord.published_at.desc())
+                    .limit(_MAX_ARTICLES_TFIDF)
+                )
                 if cutoff is not None:
-                    q = q.filter(ArticleRecord.published_at >= cutoff)
-                else:
-                    q = q.limit(500)  # sem limite de data: pega os 500 mais recentes
+                    q = (
+                        session.query(ArticleRecord)
+                        .filter(ArticleRecord.published_at >= cutoff)
+                        .order_by(ArticleRecord.published_at.desc())
+                        .limit(_MAX_ARTICLES_TFIDF)
+                    )
                 records = q.all()
                 effective_hours = candidate_hours
                 if records:
