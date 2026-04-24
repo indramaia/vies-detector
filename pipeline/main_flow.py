@@ -167,6 +167,9 @@ def task_aggregate_contextualize(
         )
 
 
+# Fique ok > baixa o app, liga o 0800, whatsapp. 
+# nutricionista, psicólogo, 
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  FLOW PRINCIPAL
 # ══════════════════════════════════════════════════════════════════════════════
