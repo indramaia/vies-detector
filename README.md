@@ -262,7 +262,7 @@ Sentenças factuais têm peso 0 e não elevam o score. O resultado varia de **0*
 
 | Faixa      | Interpretação                                                                 |
 |------------|-------------------------------------------------------------------------------|
-| 0.0 – 0.4  | Predominantemente factual — poucas sentenças enviesadas, intensidade leve     |
+| 0.0 – 0.4  | Factual — poucas sentenças enviesadas, intensidade leve     |
 | 0.4 – 0.8  | Viés moderado — presença notável de sentenças enviesadas                      |
 | 0.8 – 1.4  | Viés elevado — mistura significativa de enviesadas e fortemente enviesadas    |
 | 1.4 – 2.0  | Linguagem fortemente enviesada — alta concentração de conteúdo carregado      |
