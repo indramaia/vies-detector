@@ -31,13 +31,25 @@ SOURCES: list[NewsSource] = [
     ),
     NewsSource(
         name="O Estado de S. Paulo",
-        url="https://www.estadao.com.br/rss/ultimas.xml",
+        url="https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/brasil/",
+        ideology_id="estadao",
+    ),
+    NewsSource(
+        name="O Estado de S. Paulo - Política",
+        url="https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/politica/",
+        ideology_id="estadao",
+    ),
+    NewsSource(
+        name="O Estado de S. Paulo - Economia",
+        url="https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/economia/",
         ideology_id="estadao",
     ),
     NewsSource(
         name="O Globo",
-        url="https://oglobo.globo.com/rss.xml",
+        url="https://news.google.com/rss/search?q=site:oglobo.globo.com&hl=pt-BR&gl=BR&ceid=BR:pt-419",
         ideology_id="oglobo",
+        # Descoberta via Google News: oglobo.globo.com removeu RSS público (paywall).
+        # Scraping cai no fallback de snippet (~1-3 sentenças) para a maioria dos artigos.
     ),
     NewsSource(
         name="Gazeta do Povo",
