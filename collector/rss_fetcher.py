@@ -21,13 +21,11 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from urllib.parse import urljoin
 
 import feedparser
-import requests
-from bs4 import BeautifulSoup
 from loguru import logger
 
+from .article_scraper import scrape_article
 from .deduplicator import Deduplicator, compute_hash
 from .preprocessor import preprocess_article
 from .sources import NewsSource, ACTIVE_SOURCES
@@ -36,11 +34,6 @@ from .sources import NewsSource, ACTIVE_SOURCES
 # ──────────────────────────────────────────────────────────────────
 # Config
 # ──────────────────────────────────────────────────────────────────
-USER_AGENT = (
-    "Mozilla/5.0 (compatible; BiasRadarBot/1.0; "
-    "+https://biasradar.lovable.app)"
-)
-SCRAPE_TIMEOUT = 8  # segundos
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -113,52 +106,6 @@ def _extract_image_from_entry(entry: feedparser.FeedParserDict) -> str | None:
     return None
 
 
-def _extract_og_image(soup: BeautifulSoup, base_url: str) -> str | None:
-    """Extrai a imagem destacada da página HTML."""
-    # 1. og:image (Open Graph)
-    og = soup.find("meta", property="og:image")
-    if og and og.get("content"):
-        return urljoin(base_url, og["content"])
-
-    # 2. twitter:image
-    tw = soup.find("meta", attrs={"name": "twitter:image"})
-    if tw and tw.get("content"):
-        return urljoin(base_url, tw["content"])
-
-    # 3. primeira <img> dentro de <article>
-    article_tag = soup.find("article") or soup
-    img = article_tag.find("img")
-    if img and img.get("src"):
-        return urljoin(base_url, img["src"])
-
-    return None
-
-
-def _scrape_image_fallback(url: str) -> str | None:
-    """
-    Faz GET na URL do artigo e tenta extrair og:image / twitter:image.
-    Usado APENAS quando o RSS não traz imagem.
-    """
-    try:
-        resp = requests.get(
-            url,
-            timeout=SCRAPE_TIMEOUT,
-            headers={"User-Agent": USER_AGENT},
-            allow_redirects=True,
-        )
-        resp.raise_for_status()
-    except Exception as exc:
-        logger.debug(f"Fallback og:image falhou para {url}: {exc}")
-        return None
-
-    try:
-        soup = BeautifulSoup(resp.text, "html.parser")
-        return _extract_og_image(soup, url)
-    except Exception as exc:
-        logger.debug(f"Parse HTML falhou para {url}: {exc}")
-        return None
-
-
 # ──────────────────────────────────────────────────────────────────
 # RSS helpers
 # ──────────────────────────────────────────────────────────────────
@@ -189,18 +136,18 @@ def fetch_feed(
     source: NewsSource,
     deduplicator: Deduplicator,
     request_delay: float = 1.0,
-    enable_image_fallback: bool = True,
+    enable_scraping: bool = True,
 ) -> list[ArticleData]:
     """
-    Coleta e pré-processa artigos de um único feed RSS.
+    Coleta artigos de um único feed RSS e raspa o corpo completo de cada artigo.
 
     Args:
-        source                : NewsSource com URL do feed
-        deduplicator          : instância Deduplicator para verificar duplicatas
-        request_delay         : pausa em segundos após o feed (cortesia ao servidor)
-        enable_image_fallback : se True, faz GET extra pra pegar og:image quando
-                                o RSS não traz imagem. Custo: 1 request por artigo
-                                novo sem imagem.
+        source          : NewsSource com URL do feed
+        deduplicator    : instância Deduplicator para verificar duplicatas
+        request_delay   : pausa em segundos entre feeds (cortesia ao servidor)
+        enable_scraping : se True, faz GET na página do artigo para extrair
+                          corpo completo + imagem numa única requisição.
+                          Desative em testes ou quando a rede não estiver disponível.
 
     Returns:
         Lista de ArticleData novos (não duplicados).
@@ -221,7 +168,7 @@ def fetch_feed(
             logger.warning(f"[{source.name}] Feed malformado: {bozo_msg}")
 
     articles: list[ArticleData] = []
-    fallback_count = 0
+    scraped_count = 0
     duplicate_count = 0
 
     for entry in feed.entries:
@@ -233,26 +180,28 @@ def fetch_feed(
             duplicate_count += 1
             continue
 
-        url_hash = deduplicator.register(url)
-        raw_text = _extract_text(entry)
-        processed = preprocess_article(raw_text)
+        url_hash  = deduplicator.register(url)
+        rss_text  = _extract_text(entry)
+        image_url = _extract_image_from_entry(entry)
+        full_text = ""
+
+        if enable_scraping:
+            scraped = scrape_article(url)
+            if scraped["ok"]:
+                full_text = scraped["full_text"]   # em memória, não persistido
+                scraped_count += 1
+            # imagem do scraper só se o RSS não trouxe
+            if not image_url and scraped.get("image_url"):
+                image_url = scraped["image_url"]
+            time.sleep(0.5)  # cortesia entre requisições do mesmo veículo
+
+        processed = preprocess_article(rss_text, full_text)
 
         if processed["sentence_count"] == 0:
             logger.debug(f"[{source.name}] Artigo sem sentenças válidas: {url}")
             continue
 
-        # 1) tenta imagem direto do RSS (grátis)
-        image_url = _extract_image_from_entry(entry)
-
-        # 2) fallback: scraping da página pra pegar og:image
-        if not image_url and enable_image_fallback:
-            image_url = _scrape_image_fallback(url)
-            if image_url:
-                fallback_count += 1
-            # cortesia: pequena pausa entre scrapes do mesmo veículo
-            time.sleep(0.5)
-
-        article = ArticleData(
+        articles.append(ArticleData(
             url_hash=url_hash,
             url=url,
             title=getattr(entry, "title", "Sem título"),
@@ -263,15 +212,14 @@ def fetch_feed(
             sentences=processed["sentences"],
             sentence_count=processed["sentence_count"],
             image_url=image_url,
-        )
-        articles.append(article)
+        ))
 
     time.sleep(request_delay)
     if duplicate_count:
         logger.debug(f"[{source.name}] {duplicate_count} duplicatas ignoradas.")
     logger.info(
-        f"[{source.name}] {len(articles)} artigos novos coletados "
-        f"({fallback_count} via fallback og:image)."
+        f"[{source.name}] {len(articles)} artigos novos "
+        f"({scraped_count} com corpo completo raspado)."
     )
     return articles
 
@@ -280,16 +228,16 @@ def fetch_all_feeds(
     deduplicator: Deduplicator,
     sources: list[NewsSource] | None = None,
     request_delay: float = 1.0,
-    enable_image_fallback: bool = True,
+    enable_scraping: bool = True,
 ) -> list[ArticleData]:
     """
-    Coleta feeds de todos os veículos ativos.
+    Coleta feeds de todos os veículos ativos e raspa o corpo dos artigos.
 
     Args:
-        deduplicator          : instância compartilhada para deduplicação global
-        sources               : lista personalizada; usa ACTIVE_SOURCES se None
-        request_delay         : pausa entre requisições de feed
-        enable_image_fallback : ativa scraping de og:image quando RSS não traz
+        deduplicator    : instância compartilhada para deduplicação global
+        sources         : lista personalizada; usa ACTIVE_SOURCES se None
+        request_delay   : pausa entre requisições de feed
+        enable_scraping : ativa raspagem do corpo completo de cada artigo
 
     Returns:
         Lista concatenada de ArticleData de todos os veículos.
@@ -303,7 +251,7 @@ def fetch_all_feeds(
                 source,
                 deduplicator,
                 request_delay,
-                enable_image_fallback=enable_image_fallback,
+                enable_scraping=enable_scraping,
             )
             all_articles.extend(articles)
         except Exception as exc:

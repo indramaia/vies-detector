@@ -10,16 +10,14 @@ Intervalo: [0.0, 2.0]
     0.0 → todas as sentenças factuais
     2.0 → todas as sentenças fortemente enviesadas
 
-Tabela de referência:
-    [0.0, 0.4) → Predominantemente factual
-    [0.4, 0.8) → Viés moderado
-    [0.8, 1.4) → Viés elevado
-    [1.4, 2.0] → Linguagem fortemente enviesada
+Tabela de referência (3 faixas — espelha as classes do modelo):
+    [0.0, 0.67) → Factual
+    [0.67, 1.33) → Enviesada
+    [1.33, 2.0] → Fortemente enviesada
 """
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Sequence
 from classifier.sentence_classifier import SentenceResult
 
 
@@ -30,12 +28,11 @@ CLASS_WEIGHTS: dict[str, float] = {
     "fortemente_enviesada": 2.0,
 }
 
-# ── Faixas interpretativas ────────────────────────────────────────────────────
+# ── Faixas interpretativas (3 classes — espelha o classificador) ──────────────
 BIAS_BANDS: list[tuple[float, float, str]] = [
-    (0.0, 0.4,  "Predominantemente factual"),
-    (0.4, 0.8,  "Viés moderado"),
-    (0.8, 1.4,  "Viés elevado"),
-    (1.4, 2.01, "Linguagem fortemente enviesada"),
+    (0.0,  0.67, "Factual"),
+    (0.67, 1.33, "Enviesada"),
+    (1.33, 2.01, "Fortemente enviesada"),
 ]
 
 
