@@ -38,12 +38,29 @@ def _get_engine():
     Evita que o Neon acorde ao subir o Flask/gunicorn sem requests reais."""
     global _engine, _SessionLocal
     if _engine is None:
+        db_url = os.environ["DATABASE_URL"]
+        is_postgres = db_url.startswith("postgresql")
+
+        # TCP keepalive: instrui o OS a manter a conexão SSL viva durante idle.
+        # Essencial para o pipeline (BERTimbau pode rodar 15-20 min sem tocar o banco).
+        # Ignorado no SQLite (desenvolvimento local).
+        connect_args = (
+            {
+                "keepalives":          1,
+                "keepalives_idle":    60,   # envia keepalive após 60s ocioso
+                "keepalives_interval": 10,  # re-tenta a cada 10s
+                "keepalives_count":    5,   # desiste após 5 falhas
+            }
+            if is_postgres else {}
+        )
+
         _engine = create_engine(
-            os.environ["DATABASE_URL"],
+            db_url,
             use_insertmanyvalues=False,
             implicit_returning=False,
-            pool_pre_ping=True,   # reconecta automaticamente se SSL cair durante idle
-            pool_recycle=280      # descarta conexões após 4m40s (Neon fecha após ~5min idle)           
+            pool_pre_ping=True,
+            pool_recycle=280,
+            connect_args=connect_args,
         )
         _SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
     return _engine, _SessionLocal
