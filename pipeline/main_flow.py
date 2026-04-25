@@ -75,19 +75,25 @@ def task_classify(articles: list[ArticleData]) -> list[ArticleBiasResult]:
     return results
 
 
+_PERSIST_BATCH = 50   # commit a cada N artigos — evita transação gigante + SSL timeout
+
+
 def task_persist(
     articles: list[ArticleData],
     bias_results: list[ArticleBiasResult],
     db_session,
 ) -> None:
-    """Persiste metadados, resultados de artigos e sentenças no banco."""
+    """Persiste metadados, resultados de artigos e sentenças no banco.
 
+    Commits intermediários a cada _PERSIST_BATCH artigos para manter transações
+    curtas e evitar SSL timeout do Neon durante inserções volumosas.
+    """
     bias_map = {r.url_hash: r for r in bias_results}
 
-    for art in articles:
+    for i, art in enumerate(articles):
         bias = bias_map.get(art.url_hash)
 
-        article_rec = ArticleRecord(
+        db_session.add(ArticleRecord(
             url_hash=art.url_hash,
             url=art.url,
             title=art.title,
@@ -102,13 +108,12 @@ def task_persist(
             n_factual=bias.n_factual if bias else None,
             n_biased=bias.n_biased if bias else None,
             n_strongly_biased=bias.n_strongly_biased if bias else None,
-            image_url=art.image_url
-        )
-        db_session.add(article_rec)
+            image_url=art.image_url,
+        ))
 
         if bias:
             for sr in bias.sentence_results:
-                sent_rec = SentenceRecord(
+                db_session.add(SentenceRecord(
                     url_hash=art.url_hash,
                     sentence=sr.sentence,
                     label=sr.label,
@@ -117,10 +122,14 @@ def task_persist(
                     score_factual=sr.scores.get("factual", 0.0),
                     score_biased=sr.scores.get("enviesada", 0.0),
                     score_strongly_biased=sr.scores.get("fortemente_enviesada", 0.0),
-                )
-                db_session.add(sent_rec)
+                ))
 
-    db_session.commit()
+        # Commit intermediário: mantém transações curtas e a conexão SSL viva
+        if (i + 1) % _PERSIST_BATCH == 0:
+            db_session.commit()
+            logger.debug(f"Commit parcial: {i + 1}/{len(articles)} artigos.")
+
+    db_session.commit()   # commit do lote final
     logger.info(f"Persistidos {len(articles)} artigos no banco.")
 
 
