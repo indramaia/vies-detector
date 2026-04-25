@@ -185,7 +185,7 @@ def fetch_feed(
         image_url = _extract_image_from_entry(entry)
         full_text = ""
 
-        if enable_scraping:
+        if enable_scraping and source.scraping:
             scraped = scrape_article(url)
             if scraped["ok"]:
                 full_text = scraped["full_text"]   # em memória, não persistido
