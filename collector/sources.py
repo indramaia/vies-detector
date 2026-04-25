@@ -20,6 +20,7 @@ class NewsSource:
     url: str
     ideology_id: str
     active: bool = True
+    scraping: bool = True  # False quando URLs do feed não são scrapeáveis diretamente
 
 
 # ── Veículos monitorados ──────────────────────────────────────────────────────
@@ -48,8 +49,7 @@ SOURCES: list[NewsSource] = [
         name="O Globo",
         url="https://news.google.com/rss/search?q=site:oglobo.globo.com&hl=pt-BR&gl=BR&ceid=BR:pt-419",
         ideology_id="oglobo",
-        # Descoberta via Google News: oglobo.globo.com removeu RSS público (paywall).
-        # Scraping cai no fallback de snippet (~1-3 sentenças) para a maioria dos artigos.
+        scraping=False,  # Google News usa JS redirect — requests não segue; usa snippet do RSS
     ),
     NewsSource(
         name="Gazeta do Povo",

@@ -19,6 +19,7 @@ LGPD:
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -167,36 +168,49 @@ def fetch_feed(
         else:
             logger.warning(f"[{source.name}] Feed malformado: {bozo_msg}")
 
-    articles: list[ArticleData] = []
-    scraped_count = 0
     duplicate_count = 0
 
+    # Fase 1 — deduplicação sequencial (necessário para thread safety do Deduplicator)
+    pending: list[tuple] = []   # (url_hash, url, rss_text, image_rss, entry)
     for entry in feed.entries:
         url = getattr(entry, "link", None)
         if not url:
             continue
-
         if deduplicator.is_duplicate(url):
             duplicate_count += 1
             continue
-
         url_hash  = deduplicator.register(url)
         rss_text  = _extract_text(entry)
-        image_url = _extract_image_from_entry(entry)
-        full_text = ""
+        image_rss = _extract_image_from_entry(entry)
+        pending.append((url_hash, url, rss_text, image_rss, entry))
 
-        if enable_scraping:
-            scraped = scrape_article(url)
-            if scraped["ok"]:
-                full_text = scraped["full_text"]   # em memória, não persistido
-                scraped_count += 1
-            # imagem do scraper só se o RSS não trouxe
-            if not image_url and scraped.get("image_url"):
-                image_url = scraped["image_url"]
-            time.sleep(0.5)  # cortesia entre requisições do mesmo veículo
+    # Fase 2 — scraping paralelo (I/O-bound; 3 workers por veículo)
+    scrape_map: dict[str, dict] = {}
+    scraped_count = 0
+    if enable_scraping and source.scraping and pending:
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            future_to_url = {
+                pool.submit(scrape_article, url): url
+                for _, url, _, _, _ in pending
+            }
+            for future in as_completed(future_to_url):
+                url = future_to_url[future]
+                try:
+                    result = future.result()
+                except Exception:
+                    result = {"full_text": "", "image_url": None, "ok": False}
+                scrape_map[url] = result
+                if result["ok"]:
+                    scraped_count += 1
+
+    # Fase 3 — construção dos ArticleData (preserva ordem original do feed)
+    articles: list[ArticleData] = []
+    for url_hash, url, rss_text, image_rss, entry in pending:
+        scraped   = scrape_map.get(url, {})
+        full_text = scraped.get("full_text", "") if scraped.get("ok") else ""
+        image_url = image_rss or scraped.get("image_url")
 
         processed = preprocess_article(rss_text, full_text)
-
         if processed["sentence_count"] == 0:
             logger.debug(f"[{source.name}] Artigo sem sentenças válidas: {url}")
             continue

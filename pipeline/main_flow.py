@@ -61,7 +61,7 @@ def task_classify(articles: list[ArticleData]) -> list[ArticleBiasResult]:
     for art in articles:
         if not art.sentences:
             continue
-        sentence_results = clf.classify_batch(art.sentences)
+        sentence_results = clf.classify_batch(art.sentences[:_MAX_SENTENCES_CLASSIFY])
         bias_result = compute_article_bias(
             url_hash=art.url_hash,
             source_name=art.source_name,
@@ -74,7 +74,8 @@ def task_classify(articles: list[ArticleData]) -> list[ArticleBiasResult]:
     return results
 
 
-_PERSIST_BATCH = 50   # commit a cada N artigos — evita transação gigante + SSL timeout
+_PERSIST_BATCH = 50          # commit a cada N artigos — evita transação gigante + SSL timeout
+_MAX_SENTENCES_CLASSIFY = 20 # primeiras N sentenças por artigo — jornalismo concentra viés no lide
 
 
 def task_persist(
