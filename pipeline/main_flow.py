@@ -35,16 +35,15 @@ from scripts.setup_db import (
 #  TASKS — cada camada é uma task Prefect com retry automático
 # ══════════════════════════════════════════════════════════════════════════════
 
-def task_collect(db_session) -> list[ArticleData]:
-    """Camada 1: coleta RSS com deduplicação baseada no banco de dados."""
+def task_collect(existing_hashes: set) -> list[ArticleData]:
+    """Camada 1: coleta RSS com deduplicação baseada no banco de dados.
 
-    # Backend de deduplicação: hashes já presentes no banco
-    existing_hashes = {row.url_hash for row in db_session.query(ArticleRecord.url_hash).all()}
-    logger.info(f"Hashes já registrados no banco: {len(existing_hashes)}")
-
+    Recebe os hashes já como conjunto (a sessão DB deve estar fechada antes
+    de chamar esta função — fetch_all_feeds leva vários minutos e uma conexão
+    aberta durante esse tempo é morta pelo Neon por inatividade).
+    """
     dedup    = Deduplicator(backend=existing_hashes)
     articles = fetch_all_feeds(dedup)
-    
     logger.info(f"Artigos novos coletados: {len(articles)}")
     return articles
 
@@ -189,11 +188,14 @@ def run_pipeline(window_days: int = 30) -> None:
     Pode ser agendado via Prefect:
         prefect deployment apply pipeline/deployment.yaml
     """
-    # Sessão 1: apenas busca hashes para deduplicação e fecha imediatamente.
-    # Não pode ser mantida aberta durante a classificação (BERTimbau leva minutos
-    # em CPU) — o Neon fecha SSL de conexões ociosas após ~5min.
+    # Sessão 1: busca hashes e fecha ANTES de iniciar a coleta RSS.
+    # fetch_all_feeds leva vários minutos (scraping por artigo) — manter a
+    # conexão aberta durante esse tempo causa SSL timeout no Neon.
     with get_session() as session:
-        articles = task_collect(session)
+        existing_hashes = {row.url_hash for row in session.query(ArticleRecord.url_hash).all()}
+    logger.info(f"Hashes já registrados no banco: {len(existing_hashes)}")
+
+    articles = task_collect(existing_hashes)
 
     # Classificação sem nenhuma conexão aberta.
     bias_results = task_classify(articles)
