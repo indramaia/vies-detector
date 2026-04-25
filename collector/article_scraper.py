@@ -26,10 +26,16 @@ MIN_PARA_CHARS   = 40   # <p> com menos caracteres são descartados (artefatos)
 
 _HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (compatible; BiasRadarBot/1.0; "
-        "+https://biasradar.lovable.app)"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
     ),
-    "Accept-Language": "pt-BR,pt;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Cache-Control": "max-age=0",
 }
 
 # Seletores em ordem de prioridade — mais semântico → mais genérico.
