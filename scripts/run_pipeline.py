@@ -28,6 +28,7 @@ from pipeline.main_flow import run_pipeline
 
 
 def main():
+    
     parser = argparse.ArgumentParser(description="Executa o pipeline Viés Detector")
     parser.add_argument(
         "--window",
@@ -40,6 +41,9 @@ def main():
     logger.info("Inicializando banco de dados…")
     init_db()
 
+
+    # período de artigos considerados para calcular o BiasScore médio por veículo que aparece no frontend.
+    # Quando o pipeline roda, a Camada 3 agrega todos os artigos coletados nos últimos 30 dias para cada veículo.
     logger.info(f"Iniciando pipeline (janela={args.window} dias)…")
     run_pipeline(window_days=args.window)
     logger.info("Pipeline concluído com sucesso.")
