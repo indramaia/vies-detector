@@ -48,14 +48,16 @@ def _get_engine():
         # API (Flask/gunicorn) usa QueuePool padrão com keepalive.
         use_nullpool = os.getenv("PIPELINE_MODE", "0") == "1"
 
+        # Keepalives apply to all PostgreSQL connections — NullPool included.
+        # Without them, Neon drops long-running write sessions mid-transaction.
         connect_args = (
             {
                 "keepalives":          1,
-                "keepalives_idle":    60,
+                "keepalives_idle":    30,
                 "keepalives_interval": 10,
                 "keepalives_count":    5,
             }
-            if is_postgres and not use_nullpool else {}
+            if is_postgres else {}
         )
 
         pool_kwargs = (
