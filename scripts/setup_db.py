@@ -25,6 +25,7 @@ from sqlalchemy import (
     ForeignKey, create_engine, UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 load_dotenv()
 
@@ -41,26 +42,34 @@ def _get_engine():
         db_url = os.environ["DATABASE_URL"]
         is_postgres = db_url.startswith("postgresql")
 
-        # TCP keepalive: instrui o OS a manter a conexão SSL viva durante idle.
-        # Essencial para o pipeline (BERTimbau pode rodar 15-20 min sem tocar o banco).
-        # Ignorado no SQLite (desenvolvimento local).
+        # PIPELINE_MODE=1 → NullPool: sem reutilização de conexões.
+        # Cada get_session() cria uma TCP fresca direto no Neon e fecha ao sair.
+        # Elimina SSL timeout em scripts one-shot (GitHub Actions).
+        # API (Flask/gunicorn) usa QueuePool padrão com keepalive.
+        use_nullpool = os.getenv("PIPELINE_MODE", "0") == "1"
+
         connect_args = (
             {
                 "keepalives":          1,
-                "keepalives_idle":    60,   # envia keepalive após 60s ocioso
-                "keepalives_interval": 10,  # re-tenta a cada 10s
-                "keepalives_count":    5,   # desiste após 5 falhas
+                "keepalives_idle":    60,
+                "keepalives_interval": 10,
+                "keepalives_count":    5,
             }
-            if is_postgres else {}
+            if is_postgres and not use_nullpool else {}
+        )
+
+        pool_kwargs = (
+            {"poolclass": NullPool}
+            if use_nullpool
+            else {"pool_pre_ping": True, "pool_recycle": 280}
         )
 
         _engine = create_engine(
             db_url,
             use_insertmanyvalues=False,
             implicit_returning=False,
-            pool_pre_ping=True,
-            pool_recycle=280,
             connect_args=connect_args,
+            **pool_kwargs,
         )
         _SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
     return _engine, _SessionLocal

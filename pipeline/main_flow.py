@@ -198,9 +198,12 @@ def run_pipeline(window_days: int = 30) -> None:
     # Classificação sem nenhuma conexão aberta.
     bias_results = task_classify(articles)
 
-    # Sessão 2: conexão fresca, aberta só agora para INSERT + aggregation.
+    # Sessão 2a: persiste artigos e sentenças (batch commits internos).
     with get_session() as session:
         task_persist(articles, bias_results, session)
+
+    # Sessão 2b: agrega índices por veículo (conexão fresca, rápido).
+    with get_session() as session:
         task_aggregate_contextualize(bias_results, session, window_days)
 
 

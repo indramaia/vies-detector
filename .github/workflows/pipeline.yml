@@ -35,4 +35,5 @@ jobs:
       - name: Rodar pipeline
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PIPELINE_MODE: "1"
         run: python scripts/run_pipeline.py
