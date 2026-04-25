@@ -53,6 +53,7 @@ class ArticleData:
     sentences: list[str]
     sentence_count: int
     image_url: str | None = None
+    scraped: bool = False  # True se o corpo completo foi extraído com sucesso
     collected_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -206,9 +207,10 @@ def fetch_feed(
     # Fase 3 — construção dos ArticleData (preserva ordem original do feed)
     articles: list[ArticleData] = []
     for url_hash, url, rss_text, image_rss, entry in pending:
-        scraped   = scrape_map.get(url, {})
-        full_text = scraped.get("full_text", "") if scraped.get("ok") else ""
-        image_url = image_rss or scraped.get("image_url")
+        scrape_result = scrape_map.get(url, {})
+        ok        = scrape_result.get("ok", False)
+        full_text = scrape_result.get("full_text", "") if ok else ""
+        image_url = image_rss or scrape_result.get("image_url")
 
         processed = preprocess_article(rss_text, full_text)
         if processed["sentence_count"] == 0:
@@ -226,6 +228,7 @@ def fetch_feed(
             sentences=processed["sentences"],
             sentence_count=processed["sentence_count"],
             image_url=image_url,
+            scraped=ok,
         ))
 
     time.sleep(request_delay)

@@ -406,20 +406,26 @@ def similar_articles(url_hash: str):
         return jsonify(cached)
 
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         with get_session() as session:
             anchor = session.get(ArticleRecord, url_hash)
             if anchor is None:
                 abort(404, description=f"Artigo '{url_hash}' não encontrado.")
 
+            # Janela centrada no published_at do âncora: busca artigos publicados
+            # no mesmo período, não nos últimas N horas a partir de agora.
+            anchor_time = anchor.published_at or datetime.now(timezone.utc)
+            time_min = anchor_time - timedelta(hours=hours)
+            time_max = anchor_time + timedelta(hours=min(hours // 4, 48))
+
             candidates = (
                 session.query(ArticleRecord)
                 .filter(
-                    ArticleRecord.published_at >= cutoff,
+                    ArticleRecord.published_at >= time_min,
+                    ArticleRecord.published_at <= time_max,
                     ArticleRecord.url_hash != url_hash,
                 )
                 .order_by(ArticleRecord.published_at.desc())
-                .limit(300)
+                .limit(500)
                 .all()
             )
             result = find_similar(anchor, candidates, threshold=threshold, limit=limit)

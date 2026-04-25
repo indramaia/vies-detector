@@ -15,7 +15,7 @@ Referência:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from loguru import logger
 from collector import fetch_all_feeds, Deduplicator, ArticleData
@@ -74,7 +74,6 @@ def task_classify(articles: list[ArticleData]) -> list[ArticleBiasResult]:
     return results
 
 
-_PERSIST_BATCH = 50          # commit a cada N artigos — evita transação gigante + SSL timeout
 _MAX_SENTENCES_CLASSIFY = 20 # primeiras N sentenças por artigo — jornalismo concentra viés no lide
 
 
@@ -85,15 +84,18 @@ def task_persist(
 ) -> None:
     """Persiste metadados, resultados de artigos e sentenças no banco.
 
-    Commits intermediários a cada _PERSIST_BATCH artigos para manter transações
-    curtas e evitar SSL timeout do Neon durante inserções volumosas.
+    bulk_insert_mappings envia todos os registros em dois round-trips ao Neon
+    (artigos + sentenças), eliminando os ~10.000 round-trips individuais do ORM.
     """
     bias_map = {r.url_hash: r for r in bias_results}
 
-    for i, art in enumerate(articles):
+    article_rows: list[dict] = []
+    sentence_rows: list[dict] = []
+
+    for art in articles:
         bias = bias_map.get(art.url_hash)
 
-        db_session.add(ArticleRecord(
+        article_rows.append(dict(
             url_hash=art.url_hash,
             url=art.url,
             title=art.title,
@@ -113,7 +115,7 @@ def task_persist(
 
         if bias:
             for sr in bias.sentence_results:
-                db_session.add(SentenceRecord(
+                sentence_rows.append(dict(
                     url_hash=art.url_hash,
                     sentence=sr.sentence,
                     label=sr.label,
@@ -124,13 +126,13 @@ def task_persist(
                     score_strongly_biased=sr.scores.get("fortemente_enviesada", 0.0),
                 ))
 
-        # Commit intermediário: mantém transações curtas e a conexão SSL viva
-        if (i + 1) % _PERSIST_BATCH == 0:
-            db_session.commit()
-            logger.debug(f"Commit parcial: {i + 1}/{len(articles)} artigos.")
+    if article_rows:
+        db_session.bulk_insert_mappings(ArticleRecord, article_rows)
+    if sentence_rows:
+        db_session.bulk_insert_mappings(SentenceRecord, sentence_rows)
 
-    db_session.commit()   # commit do lote final
-    logger.info(f"Persistidos {len(articles)} artigos no banco.")
+    db_session.commit()
+    logger.info(f"Persistidos {len(article_rows)} artigos e {len(sentence_rows)} sentenças no banco.")
 
 
 def task_aggregate_contextualize(
@@ -138,13 +140,49 @@ def task_aggregate_contextualize(
     db_session,
     window_days: int = 30,
 ) -> None:
-    """Camadas 3 + 4: agrega por veículo e salva índice com contexto ideológico."""
-  
-    if not bias_results:
-        logger.info("Nenhum resultado para agregar.")
+    """Camadas 3 + 4: agrega por veículo e salva índice com contexto ideológico.
+
+    Consulta o banco para TODOS os artigos na janela de window_days dias —
+    não apenas os da corrida atual — para que mean_bias reflita o histórico
+    completo de 30 dias, e não só os artigos recém-coletados.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
+
+    window_records = (
+        db_session.query(ArticleRecord)
+        .filter(
+            ArticleRecord.published_at >= cutoff,
+            ArticleRecord.bias_score.isnot(None),
+        )
+        .all()
+    )
+
+    if not window_records:
+        logger.info("Nenhum artigo com bias_score na janela de %d dias.", window_days)
         return
 
-    vehicle_indices = aggregate_by_vehicle(bias_results, window_days=window_days)
+    logger.info(
+        f"Agregando {len(window_records)} artigos dos últimos {window_days} dias "
+        f"(corrida atual contribuiu com {len(bias_results)})."
+    )
+
+    window_results = [
+        ArticleBiasResult(
+            url_hash=rec.url_hash,
+            source_name=rec.source_name,
+            ideology_id=rec.ideology_id,
+            bias_score=rec.bias_score,
+            interpretation=rec.bias_interpretation or "",
+            sentence_count=rec.sentence_count or 0,
+            n_factual=rec.n_factual or 0,
+            n_biased=rec.n_biased or 0,
+            n_strongly_biased=rec.n_strongly_biased or 0,
+            sentence_results=[],
+        )
+        for rec in window_records
+    ]
+
+    vehicle_indices = aggregate_by_vehicle(window_results, window_days=window_days)
     contexts = contextualize_all(vehicle_indices)
     spectrum = get_spectrum_summary(contexts)
 
@@ -198,8 +236,21 @@ def run_pipeline(window_days: int = 30) -> None:
 
     articles = task_collect(existing_hashes)
 
+    scraped_full  = sum(1 for a in articles if a.scraped)
+    scrape_failed = len(articles) - scraped_full
+    logger.info(
+        f"Scraping — completo: {scraped_full} | "
+        f"fallback (RSS/snippet): {scrape_failed} | "
+        f"taxa: {scraped_full/len(articles)*100:.1f}%" if articles else "Scraping — 0 artigos."
+    )
+
     # Classificação sem nenhuma conexão aberta.
     bias_results = task_classify(articles)
+    logger.info(
+        f"Classificação — {len(bias_results)} artigos | "
+        f"com corpo completo: {sum(1 for a in articles if a.scraped and a.url_hash in {r.url_hash for r in bias_results})} | "
+        f"só snippet: {sum(1 for a in articles if not a.scraped and a.url_hash in {r.url_hash for r in bias_results})}"
+    )
 
     # Sessão 2a: persiste artigos e sentenças (batch commits internos).
     with get_session() as session:

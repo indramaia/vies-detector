@@ -220,8 +220,8 @@ def find_similar(
     if not pool:
         return []
 
-    anchor_text = f"{anchor.title or ''} {anchor.title or ''} {anchor.snippet or ''}"
-    pool_texts  = [f"{c.title or ''} {c.title or ''} {c.snippet or ''}" for c in pool]
+    anchor_text = f"{anchor.title or ''} {anchor.title or ''} {anchor.title or ''} {anchor.snippet or ''}"
+    pool_texts  = [f"{c.title or ''} {c.title or ''} {c.title or ''} {c.snippet or ''}" for c in pool]
 
     try:
         vectorizer = TfidfVectorizer(
