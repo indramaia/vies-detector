@@ -186,3 +186,86 @@ def cluster_articles(
     # Ordena por número de artigos (mais coberto primeiro)
     stories.sort(key=lambda s: s["article_count"], reverse=True)
     return stories[:max_stories]
+
+
+# ── Similaridade âncora → outros veículos ─────────────────────────────────────
+
+def find_similar(
+    anchor: Any,
+    candidates: list[Any],
+    threshold: float = 0.15,
+    limit: int = 10,
+) -> list[dict]:
+    """
+    Dado um artigo âncora, retorna os artigos mais similares de outros veículos.
+
+    Usado pelo endpoint GET /api/articles/<url_hash>/similar para exibir
+    "mesma notícia em outros veículos" ao clicar num artigo no frontend.
+
+    Args:
+        anchor     : ArticleRecord do artigo clicado
+        candidates : pool de ArticleRecord recentes (janela configurável)
+        threshold  : similaridade cosine mínima (padrão 0.15 — mais permissivo
+                     que o clustering global porque compara contra um único âncora)
+        limit      : máximo de artigos retornados
+
+    Returns:
+        Lista de dicts ordenada por similarity_score desc, excluindo o mesmo veículo.
+    """
+    # Exclui o próprio artigo e artigos do mesmo veículo
+    pool = [
+        c for c in candidates
+        if c.url_hash != anchor.url_hash and c.ideology_id != anchor.ideology_id
+    ]
+    if not pool:
+        return []
+
+    anchor_text = f"{anchor.title or ''} {anchor.title or ''} {anchor.snippet or ''}"
+    pool_texts  = [f"{c.title or ''} {c.title or ''} {c.snippet or ''}" for c in pool]
+
+    try:
+        vectorizer = TfidfVectorizer(
+            max_features=8000,
+            stop_words=_PT_STOPWORDS,
+            ngram_range=(1, 2),
+            min_df=1,
+            sublinear_tf=True,
+        )
+        tfidf = vectorizer.fit_transform([anchor_text] + pool_texts)
+    except ValueError:
+        return []
+
+    # Similaridade do âncora (linha 0) com cada candidato
+    sims = cosine_similarity(tfidf[0:1], tfidf[1:])[0]
+
+    ranked = sorted(
+        [(i, float(sims[i])) for i in range(len(pool)) if sims[i] >= threshold],
+        key=lambda x: x[1],
+        reverse=True,
+    )[:limit]
+
+    results = []
+    for idx, score in ranked:
+        art      = pool[idx]
+        spectrum = _POSITION_MAP.get(art.ideology_id, "Centro")
+        results.append({
+            "url_hash":            art.url_hash,
+            "title":               art.title,
+            "url":                 art.url,
+            "source_name":         art.source_name,
+            "ideology_id":         art.ideology_id,
+            "spectrum":            spectrum,
+            "bias_score":          art.bias_score,
+            "bias_interpretation": art.bias_interpretation,
+            "sentence_count":      art.sentence_count,
+            "n_factual":           art.n_factual,
+            "n_biased":            art.n_biased,
+            "n_strongly_biased":   art.n_strongly_biased,
+            "published_at": (
+                art.published_at.isoformat() if art.published_at else None
+            ),
+            "image_url":           art.image_url,
+            "similarity_score":    round(score, 4),
+        })
+
+    return results
