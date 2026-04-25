@@ -379,6 +379,60 @@ def spectrum():
     return jsonify(data)
 
 
+@app.get("/api/articles/<url_hash>/similar")
+def similar_articles(url_hash: str):
+    """
+    Dado um artigo (url_hash), retorna artigos similares de outros veículos
+    sobre o mesmo assunto, ordenados por similaridade TF-IDF decrescente.
+
+    Usado pelo frontend para exibir "mesma notícia em outros veículos"
+    ao clicar num artigo.
+
+    Query params:
+        limit     : max artigos retornados (padrão: 10, máx: 30)
+        threshold : similaridade cosine mínima (padrão: 0.15)
+        hours     : janela de busca em horas (padrão: 168 = 7 dias)
+    """
+    from aggregation.topic_clusterer import find_similar
+    from datetime import timedelta
+
+    limit     = min(int(request.args.get("limit",     10)),   30)
+    threshold = float(request.args.get("threshold",   0.15))
+    hours     = min(int(request.args.get("hours",    168)),  720)
+
+    cache_key = f"similar:{url_hash}:{limit}:{threshold}:{hours}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        with get_session() as session:
+            anchor = session.get(ArticleRecord, url_hash)
+            if anchor is None:
+                abort(404, description=f"Artigo '{url_hash}' não encontrado.")
+
+            candidates = (
+                session.query(ArticleRecord)
+                .filter(
+                    ArticleRecord.published_at >= cutoff,
+                    ArticleRecord.url_hash != url_hash,
+                )
+                .order_by(ArticleRecord.published_at.desc())
+                .limit(300)
+                .all()
+            )
+            result = find_similar(anchor, candidates, threshold=threshold, limit=limit)
+
+        if result:
+            _cache_set(cache_key, result, ttl=300)
+        return jsonify(result)
+
+    except Exception as exc:
+        logger.exception(f"Erro em /api/articles/{url_hash}/similar")
+        return jsonify(_cache_stale(cache_key) or [])
+
+
 @app.get("/api/articles")
 def list_articles():
     """
