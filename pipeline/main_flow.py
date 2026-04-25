@@ -77,6 +77,13 @@ def task_classify(articles: list[ArticleData]) -> list[ArticleBiasResult]:
 _MAX_SENTENCES_CLASSIFY = 20 # primeiras N sentenças por artigo — jornalismo concentra viés no lide
 
 
+def _clean(value: str | None) -> str | None:
+    """Remove bytes nulos (\x00) que o PostgreSQL rejeita em string literals."""
+    if value is None:
+        return None
+    return value.replace("\x00", "")
+
+
 def task_persist(
     articles: list[ArticleData],
     bias_results: list[ArticleBiasResult],
@@ -97,27 +104,27 @@ def task_persist(
 
         article_rows.append(dict(
             url_hash=art.url_hash,
-            url=art.url,
-            title=art.title,
+            url=_clean(art.url),
+            title=_clean(art.title),
             source_name=art.source_name,
             ideology_id=art.ideology_id,
             published_at=art.published_at,
             collected_at=art.collected_at,
-            snippet=art.snippet,
+            snippet=_clean(art.snippet),
             sentence_count=art.sentence_count,
             bias_score=bias.bias_score if bias else None,
             bias_interpretation=bias.interpretation if bias else None,
             n_factual=bias.n_factual if bias else None,
             n_biased=bias.n_biased if bias else None,
             n_strongly_biased=bias.n_strongly_biased if bias else None,
-            image_url=art.image_url,
+            image_url=_clean(art.image_url),
         ))
 
         if bias:
             for sr in bias.sentence_results:
                 sentence_rows.append(dict(
                     url_hash=art.url_hash,
-                    sentence=sr.sentence,
+                    sentence=_clean(sr.sentence),
                     label=sr.label,
                     label_id=sr.label_id,
                     confidence=sr.confidence,
