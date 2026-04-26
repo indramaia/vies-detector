@@ -24,7 +24,7 @@ import torch.nn.functional as F
 from loguru import logger
 
 from .model_loader import load_model, ID2LABEL, LABEL2ID, MAX_LENGTH
-from .types import SentenceResult
+from aggregation.bias_score import SentenceResult
 
 
 class SentenceClassifier:
