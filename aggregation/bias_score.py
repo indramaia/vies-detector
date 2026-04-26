@@ -18,7 +18,7 @@ Tabela de referência (3 faixas — espelha as classes do modelo):
 
 from __future__ import annotations
 from dataclasses import dataclass
-from classifier.sentence_classifier import SentenceResult
+from classifier.types import SentenceResult
 
 
 # ── Pesos por classe ──────────────────────────────────────────────────────────

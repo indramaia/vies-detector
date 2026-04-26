@@ -24,16 +24,7 @@ import torch.nn.functional as F
 from loguru import logger
 
 from .model_loader import load_model, ID2LABEL, LABEL2ID, MAX_LENGTH
-
-
-@dataclass
-class SentenceResult:
-    """Resultado da classificação de uma única sentença."""
-    sentence: str
-    label: str          # "factual" | "enviesada" | "fortemente_enviesada"
-    label_id: int       # 0 | 1 | 2
-    confidence: float   # probabilidade da classe predita
-    scores: dict[str, float]  # probabilidades para todas as classes
+from .types import SentenceResult
 
 
 class SentenceClassifier:
