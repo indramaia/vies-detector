@@ -61,7 +61,9 @@ def task_classify(articles: list[ArticleData]) -> list[ArticleBiasResult]:
     for art in articles:
         if not art.sentences:
             continue
-        sentence_results = clf.classify_batch(art.sentences[:_MAX_SENTENCES_CLASSIFY])
+        total_extracted = len(art.sentences)
+        to_classify     = art.sentences[:_MAX_SENTENCES_CLASSIFY]
+        sentence_results = clf.classify_batch(to_classify)
         bias_result = compute_article_bias(
             url_hash=art.url_hash,
             source_name=art.source_name,
@@ -69,12 +71,18 @@ def task_classify(articles: list[ArticleData]) -> list[ArticleBiasResult]:
             sentence_results=sentence_results,
         )
         results.append(bias_result)
+        logger.debug(
+            f"[{art.source_name}] '{art.title[:60]}' | "
+            f"extraídas={total_extracted} classificadas={len(to_classify)} "
+            f"(skipped={total_extracted - len(to_classify)}) | "
+            f"BiasScore={bias_result.bias_score:.2f} ({bias_result.interpretation})"
+        )
 
     logger.info(f"Artigos classificados: {len(results)}")
     return results
 
 
-_MAX_SENTENCES_CLASSIFY = 20 # primeiras N sentenças por artigo — jornalismo concentra viés no lide
+_MAX_SENTENCES_CLASSIFY = 100 # primeiras N sentenças por artigo — jornalismo concentra viés no lide
 
 
 def _clean(value: str | None) -> str | None:
