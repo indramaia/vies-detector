@@ -50,7 +50,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
 load_dotenv()
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from flask import Flask, jsonify, request, abort
 from flask_cors import CORS
 from loguru import logger
@@ -394,7 +394,6 @@ def similar_articles(url_hash: str):
         hours     : janela de busca em horas (padrão: 168 = 7 dias)
     """
     from aggregation.topic_clusterer import find_similar
-    from datetime import timedelta
 
     limit     = min(int(request.args.get("limit",     10)),   30)
     threshold = float(request.args.get("threshold",   0.15))
@@ -494,7 +493,6 @@ def stories():
     possa usar fallback sem tratar exceções de rede distintas.
     """
     from aggregation.topic_clusterer import cluster_articles
-    from datetime import timedelta
 
     try:
         hours     = min(int(request.args.get("hours",    48)), 168)
