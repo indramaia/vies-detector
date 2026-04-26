@@ -11,15 +11,6 @@ services:
         - scripts/setup_db.py
         - aggregation/**
         - ideological/**
-        - requirements.txt
+        - requirements-api.txt
         - Procfile
         - render.yaml
-      ignoredPaths:
-        - "README.md"
-        - "docs/**"
-        - "*.md"
-        - "scripts/generate_spectrum_chart.py"
-        - ".github/**"
-        - "classifier/**"
-        - "collector/**"
-        - "pipeline/**"

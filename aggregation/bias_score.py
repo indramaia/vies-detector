@@ -18,7 +18,16 @@ Tabela de referência (3 faixas — espelha as classes do modelo):
 
 from __future__ import annotations
 from dataclasses import dataclass
-from classifier.types import SentenceResult
+
+
+@dataclass
+class SentenceResult:
+    """Resultado da classificação de uma única sentença."""
+    sentence: str
+    label: str
+    label_id: int
+    confidence: float
+    scores: dict[str, float]
 
 
 # ── Pesos por classe ──────────────────────────────────────────────────────────
