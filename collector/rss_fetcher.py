@@ -111,6 +111,66 @@ def _extract_image_from_entry(entry: feedparser.FeedParserDict) -> str | None:
 # ──────────────────────────────────────────────────────────────────
 # RSS helpers
 # ──────────────────────────────────────────────────────────────────
+
+import re as _re
+import requests as _requests
+
+_FEED_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; feedparser/6.0)",
+    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+}
+_FEED_TIMEOUT = 15
+
+
+def _fetch_feed_robust(source: NewsSource):
+    """
+    Busca o feed em duas tentativas:
+      1. feedparser direto (caminho normal)
+      2. Se bozo E sem entradas: busca raw via requests, limpa bytes
+         ilegais e repassa ao feedparser — recupera feeds com encoding
+         quebrado ou caracteres de controle (R7, El País, Le Monde etc.)
+    """
+    try:
+        feed = feedparser.parse(source.url)
+    except Exception as exc:
+        logger.error(f"[{source.name}] Falha ao parsear feed: {exc}")
+        return None
+
+    # Feed OK ou bozo mas com entradas → usa direto
+    if not feed.bozo or feed.entries:
+        return feed
+
+    # Bozo sem entradas → tenta recuperação via raw fetch
+    logger.debug(f"[{source.name}] Tentando recuperação de feed malformado…")
+    try:
+        resp = _requests.get(source.url, headers=_FEED_HEADERS, timeout=_FEED_TIMEOUT)
+        resp.raise_for_status()
+        raw = resp.content
+
+        # Remove bytes de controle ilegais em XML (exceto \t \n \r)
+        raw_clean = _re.sub(rb"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", b"", raw)
+
+        # Tenta forçar UTF-8 se a declaração de encoding estiver errada
+        try:
+            raw_clean = raw_clean.decode("utf-8", errors="replace").encode("utf-8")
+        except Exception:
+            pass
+
+        recovered = feedparser.parse(raw_clean)
+        if recovered.entries:
+            logger.info(
+                f"[{source.name}] Feed recuperado: {len(recovered.entries)} entradas "
+                f"(encoding/caracteres ilegais corrigidos)."
+            )
+            return recovered
+        else:
+            logger.warning(f"[{source.name}] Feed malformado sem recuperação possível.")
+            return feed  # devolve o bozo original (sem entradas)
+    except Exception as exc:
+        logger.warning(f"[{source.name}] Falha na recuperação do feed: {exc}")
+        return feed
+
+
 def _parse_date(entry: feedparser.FeedParserDict) -> datetime:
     """Tenta extrair a data de publicação de uma entrada RSS."""
     if hasattr(entry, "published_parsed") and entry.published_parsed:
@@ -156,10 +216,8 @@ def fetch_feed(
     """
     logger.info(f"[{source.name}] Coletando feed: {source.url}")
 
-    try:
-        feed = feedparser.parse(source.url)
-    except Exception as exc:
-        logger.error(f"[{source.name}] Falha ao parsear feed: {exc}")
+    feed = _fetch_feed_robust(source)
+    if feed is None:
         return []
 
     if feed.bozo:
@@ -167,7 +225,7 @@ def fetch_feed(
         if "declared as" in bozo_msg and "parsed as" in bozo_msg:
             logger.debug(f"[{source.name}] Encoding declarado diferente do real (inofensivo): {bozo_msg}")
         else:
-            logger.warning(f"[{source.name}] Feed malformado: {bozo_msg}")
+            logger.warning(f"[{source.name}] Feed bozo (recuperado): {bozo_msg}")
 
     duplicate_count = 0
 

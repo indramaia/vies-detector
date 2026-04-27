@@ -11,7 +11,7 @@ Estrutura de cada entrada:
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -80,6 +80,7 @@ SOURCES: list[NewsSource] = [
         name="Veja",
         url="https://veja.abril.com.br/feed/",
         ideology_id="veja",
+        scraping=False,  # paywall duro — requests retorna página de assinatura, não artigo
     ),
     NewsSource(
         name="Agência Brasil",
@@ -88,13 +89,14 @@ SOURCES: list[NewsSource] = [
     ),
     NewsSource(
         name="R7",
-        url="https://noticias.r7.com/feed.xml",
+        url="http://www.r7.com/institucional/rss",
         ideology_id="r7",
     ),
     NewsSource(
         name="El País Brasil",
         url="https://brasil.elpais.com/rss/brasil/portada_completa.xml",
         ideology_id="elpais",
+        active=False,  # edição Brasil encerrada em dezembro 2021
     ),
     NewsSource(
         name="Metrópoles",
@@ -103,7 +105,7 @@ SOURCES: list[NewsSource] = [
     ),
     NewsSource(
         name="Brasil de Fato",
-        url="https://www.brasildefato.com.br/rss.xml",
+        url="https://www.brasildefato.com.br/feed/",
         ideology_id="brasildefato",
     ),
     NewsSource(
@@ -118,7 +120,7 @@ SOURCES: list[NewsSource] = [
     ),
     NewsSource(
         name="Le Monde Diplomatique Brasil",
-        url="https://diplomatique.org.br/feed/",
+        url="https://diplomatique.org.br/tag/pt/feed/",
         ideology_id="lemonde",
     ),
     NewsSource(
