@@ -60,6 +60,9 @@ _BODY_SELECTORS = [
     ".td-post-content",
     "#article-body",
     "#materia",
+    ".content__article-body",  # CNN Brasil
+    ".content-article__body",  # CNN Brasil (variante)
+    ".article__content-text",  # CNN Brasil (variante 2)
     "main",
 ]
 

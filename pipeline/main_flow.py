@@ -259,6 +259,16 @@ def run_pipeline(window_days: int = 30) -> None:
         f"taxa: {scraped_full/len(articles)*100:.1f}%" if articles else "Scraping — 0 artigos."
     )
 
+    # Resumo de scraping por veículo
+    from collections import defaultdict
+    vehicle_stats: dict[str, list] = defaultdict(list)
+    for a in articles:
+        vehicle_stats[a.source_name].append(a.scraped)
+    logger.info("=== SCRAPING POR VEÍCULO ===")
+    for source, flags in sorted(vehicle_stats.items()):
+        ok = sum(flags)
+        logger.info(f"  {source:30s} {ok:3d}/{len(flags):3d} ({ok/len(flags)*100:5.1f}%)")
+
     # Classificação sem nenhuma conexão aberta.
     bias_results = task_classify(articles)
     logger.info(
