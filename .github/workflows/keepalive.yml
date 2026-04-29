@@ -13,15 +13,23 @@ jobs:
     steps:
       - name: Ping /api/warmup
         run: |
-          HTTP=$(curl -s -o /tmp/body.json -w "%{http_code}" \
-            --max-time 30 \
-            https://vies-detector.onrender.com/api/warmup)
+          # Render free tier pode retornar 503 durante cold start (~30-60s).
+          # Tenta até 3 vezes com 40s de espera entre tentativas antes de falhar.
+          for attempt in 1 2 3; do
+            HTTP=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+              --max-time 40 \
+              https://vies-detector.onrender.com/api/warmup)
 
-          echo "HTTP status: $HTTP"
-          cat /tmp/body.json
+            echo "Tentativa $attempt — HTTP $HTTP"
+            cat /tmp/body.json
 
-          # Falha o job se a API retornou erro (não 2xx) — aparece vermelho no GitHub
-          if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
-            echo "ERRO: API respondeu $HTTP"
-            exit 1
-          fi
+            if [ "$HTTP" -ge 200 ] && [ "$HTTP" -lt 300 ]; then
+              echo "OK"
+              exit 0
+            fi
+
+            [ $attempt -lt 3 ] && sleep 40
+          done
+
+          echo "ERRO: API não respondeu após 3 tentativas"
+          exit 1
