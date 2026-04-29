@@ -57,7 +57,7 @@ from flask_cors import CORS
 from loguru import logger
 
 from sqlalchemy import func
-from scripts.setup_db import get_session, VehicleIndexRecord, ArticleRecord, SentenceRecord
+from scripts.setup_db import get_session, VehicleIndexRecord, ArticleRecord, SentenceRecord, HomeSummaryRecord
 from ideological import get_spectrum_summary, contextualize_all
 from aggregation import VehicleIndex
 
@@ -114,6 +114,63 @@ def _cache_keys_status() -> dict[str, str]:
         return {k: ("valid" if now < v[0] else "stale") for k, v in _CACHE.items()}
 
 
+# ── Stale-While-Revalidate (SWR) ─────────────────────────────────────────────
+# Camada 4 de resiliência: cache expirado → responde com dado antigo imediatamente
+# e dispara refresh em background. Nenhum usuário espera pelo Neon.
+#
+# Complementa o SWR do Lovable (frontend): o Lovable serve dado antigo enquanto
+# faz fetch ao Flask; o Flask por sua vez serve dado antigo enquanto atualiza
+# do Neon em background. Dois níveis sem bloqueio para o usuário.
+
+_SWR_IN_PROGRESS: set[str] = set()
+_SWR_LOCK = RLock()
+
+
+def _swr_refresh(key: str, loader, ttl: int) -> None:
+    """Executado em background — atualiza cache sem bloquear o request."""
+    try:
+        loader()
+        logger.debug(f"SWR background refresh OK: '{key}'")
+    except Exception:
+        logger.warning(f"SWR background refresh falhou: '{key}'")
+    finally:
+        with _SWR_LOCK:
+            _SWR_IN_PROGRESS.discard(key)
+
+
+def _serve_swr(key: str, loader, ttl: int):
+    """
+    Stale-While-Revalidate para um endpoint.
+
+    - Cache válido  → retorna direto (caminho feliz, sem Neon).
+    - Cache expirado com dado stale → retorna stale imediatamente
+                                       + dispara refresh em background.
+    - Cache vazio (primeiro request) → carrega sincronamente do Neon.
+
+    Garante no máximo 1 thread de refresh por chave simultânea.
+    """
+    # Cache ainda válido — caminho mais comum após warm-up
+    fresh = _cache_get(key)
+    if fresh is not None:
+        return fresh
+
+    # Cache expirado mas há dado anterior — responde imediato + revalida
+    stale = _cache_stale(key)
+    if stale is not None:
+        with _SWR_LOCK:
+            if key not in _SWR_IN_PROGRESS:
+                _SWR_IN_PROGRESS.add(key)
+                threading.Thread(
+                    target=_swr_refresh,
+                    args=(key, loader, ttl),
+                    daemon=True,
+                ).start()
+        return stale
+
+    # Primeira chamada — nenhum dado disponível, carrega sincronamente
+    return loader()
+
+
 # ── Fallback estático ─────────────────────────────────────────────────────────
 
 def _fallback_vehicles() -> list[dict]:
@@ -153,12 +210,22 @@ def _fallback_vehicles() -> list[dict]:
 
 def _load_stats() -> dict:
     with get_session() as session:
-        total_articles  = session.query(func.count(ArticleRecord.url_hash)).scalar() or 0
-        total_sentences = session.query(func.count(SentenceRecord.id)).scalar() or 0
-        total_vehicles  = session.query(
-            func.count(func.distinct(ArticleRecord.ideology_id))
-        ).scalar() or 0
-        last_updated = session.query(func.max(ArticleRecord.published_at)).scalar()
+        row = session.get(HomeSummaryRecord, 1)
+
+    if row is not None:
+        total_articles  = row.total_articles
+        total_sentences = row.total_sentences
+        total_vehicles  = row.total_vehicles
+        last_updated    = row.last_updated
+    else:
+        # Fallback: home_summary ainda não existe (pipeline nunca rodou)
+        with get_session() as session:
+            total_articles  = session.query(func.count(ArticleRecord.url_hash)).scalar() or 0
+            total_sentences = session.query(func.count(SentenceRecord.id)).scalar() or 0
+            total_vehicles  = session.query(
+                func.count(func.distinct(ArticleRecord.ideology_id))
+            ).scalar() or 0
+            last_updated = session.query(func.max(ArticleRecord.published_at)).scalar()
 
     data = {
         "total_articles":  total_articles,
@@ -293,19 +360,59 @@ def health():
     })
 
 
+@app.get("/api/warmup")
+def warmup():
+    """
+    Keep-alive chamado por cron externo (GitHub Actions / cron-job.org) a cada 5 min.
+
+    Comportamento:
+      - Se algum cache crítico expirou → recarrega do Neon (toca o banco).
+      - Se todos os caches estão válidos → faz SELECT 1 para manter Neon acordado.
+    Retorna diagnóstico de cache para monitoramento nos logs do cron.
+    """
+    from sqlalchemy import text
+
+    refreshed = []
+    errors = []
+
+    for name, loader in [
+        ("stats",    _load_stats),
+        ("vehicles", _load_vehicles),
+        ("spectrum", _load_spectrum),
+    ]:
+        if _cache_get(name) is None:
+            try:
+                loader()
+                refreshed.append(name)
+            except Exception as exc:
+                logger.warning(f"Warmup: falhou ao recarregar '{name}': {exc}")
+                errors.append(name)
+
+    if not refreshed and not errors:
+        # Caches válidos — ping mínimo para manter Neon fora do autosuspend
+        try:
+            with get_session() as session:
+                session.execute(text("SELECT 1"))
+        except Exception as exc:
+            logger.warning(f"Warmup: ping Neon falhou: {exc}")
+            errors.append("neon_ping")
+
+    return jsonify({
+        "status": "ok" if not errors else "degraded",
+        "refreshed": refreshed,
+        "errors": errors,
+        "cache": _cache_keys_status(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 @app.get("/api/stats")
 def stats():
     """Retorna totais gerais para a landing page."""
-    cached = _cache_get("stats")
-    if cached is not None:
-        return jsonify(cached)
     try:
-        return jsonify(_load_stats())
+        return jsonify(_serve_swr("stats", _load_stats, _TTL_STATS))
     except Exception:
-        logger.exception("DB error em /api/stats — tentando cache stale")
-        stale = _cache_stale("stats")
-        if stale:
-            return jsonify(stale)
+        logger.exception("DB error em /api/stats")
         return jsonify({
             "total_articles": 0, "total_sentences": 0,
             "total_vehicles": 0, "last_updated": None,
@@ -315,11 +422,8 @@ def stats():
 @app.get("/api/vehicles")
 def list_vehicles():
     """Retorna o índice editorial de todos os veículos monitorados."""
-    cached = _cache_get("vehicles")
-    if cached is not None:
-        return jsonify(cached)
     try:
-        return jsonify(_load_vehicles())
+        return jsonify(_serve_swr("vehicles", _load_vehicles, _TTL_VEHICLES))
     except Exception:
         logger.exception("DB error em /api/vehicles — servindo fallback")
         return jsonify(_cache_stale("vehicles") or _fallback_vehicles())
@@ -373,11 +477,8 @@ def spectrum():
     Retorna os veículos ordenados no espectro ideológico,
     do mais progressista ao mais conservador.
     """
-    cached = _cache_get("spectrum")
-    if cached is not None:
-        return jsonify(cached)
     try:
-        return jsonify(_load_spectrum())
+        return jsonify(_serve_swr("spectrum", _load_spectrum, _TTL_SPECTRUM))
     except Exception:
         logger.exception("DB error em /api/spectrum")
         return jsonify(_cache_stale("spectrum") or [])

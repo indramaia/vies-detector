@@ -148,6 +148,21 @@ class VehicleIndexRecord(Base):
     contextualization = Column(Text, nullable=True)
 
 
+class HomeSummaryRecord(Base):
+    """
+    Totais pré-calculados para a homepage — sempre uma única linha (id=1).
+    Atualizada pelo pipeline após cada execução; a API lê com SELECT simples.
+    Evita 4 COUNT(*) no Neon a cada expiração de cache.
+    """
+    __tablename__ = "home_summary"
+
+    id              = Column(Integer, primary_key=True, default=1)
+    total_articles  = Column(Integer, nullable=False, default=0)
+    total_sentences = Column(Integer, nullable=False, default=0)
+    total_vehicles  = Column(Integer, nullable=False, default=0)
+    last_updated    = Column(DateTime, nullable=True)
+
+
 # ── Utilitários ───────────────────────────────────────────────────────────────
 
 def init_db() -> None:

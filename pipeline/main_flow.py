@@ -14,7 +14,6 @@ Referência:
 
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 
 from loguru import logger
@@ -23,11 +22,14 @@ from classifier import SentenceClassifier
 from aggregation import compute_article_bias, aggregate_by_vehicle, ArticleBiasResult
 from ideological import contextualize_all, get_spectrum_summary
 
+from sqlalchemy import func
+
 from scripts.setup_db import (
     get_session,
     ArticleRecord,
     SentenceRecord,
     VehicleIndexRecord,
+    HomeSummaryRecord,
 )
 
 
@@ -232,6 +234,33 @@ def task_aggregate_contextualize(
 # Fique ok > baixa o app, liga o 0800, whatsapp. 
 # nutricionista, psicólogo, 
 
+def task_update_home_summary(db_session) -> None:
+    """Pré-calcula totais da homepage e grava em home_summary (upsert id=1).
+
+    Chamada uma vez ao final do pipeline — a API lê essa linha com um SELECT
+    simples em vez de 4 COUNT(*) na tabela de artigos a cada expiração de cache.
+    """
+    total_articles  = db_session.query(func.count(ArticleRecord.url_hash)).scalar() or 0
+    total_sentences = db_session.query(func.count(SentenceRecord.id)).scalar() or 0
+    total_vehicles  = db_session.query(
+        func.count(func.distinct(ArticleRecord.ideology_id))
+    ).scalar() or 0
+    last_updated = db_session.query(func.max(ArticleRecord.published_at)).scalar()
+
+    db_session.merge(HomeSummaryRecord(
+        id=1,
+        total_articles=total_articles,
+        total_sentences=total_sentences,
+        total_vehicles=total_vehicles,
+        last_updated=last_updated,
+    ))
+    db_session.commit()
+    logger.info(
+        f"home_summary atualizado: {total_articles} artigos | "
+        f"{total_sentences} sentenças | {total_vehicles} veículos."
+    )
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  FLOW PRINCIPAL
 # ══════════════════════════════════════════════════════════════════════════════
@@ -284,6 +313,10 @@ def run_pipeline(window_days: int = 30) -> None:
     # Sessão 2b: agrega índices por veículo (conexão fresca, rápido).
     with get_session() as session:
         task_aggregate_contextualize(bias_results, session, window_days)
+
+    # Sessão 2c: pré-calcula totais da homepage (uma linha, leitura barata na API).
+    with get_session() as session:
+        task_update_home_summary(session)
 
 
 if __name__ == "__main__":
