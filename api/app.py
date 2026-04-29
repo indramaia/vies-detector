@@ -42,6 +42,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+import threading
 from pathlib import Path
 from threading import RLock
 
@@ -147,6 +148,74 @@ def _fallback_vehicles() -> list[dict]:
         return []
 
 
+# ── Loaders — consultam DB, populam cache e retornam payload ─────────────────
+# Chamados tanto pelos endpoints (on-demand) quanto pelo pre-warm (startup).
+
+def _load_stats() -> dict:
+    with get_session() as session:
+        total_articles  = session.query(func.count(ArticleRecord.url_hash)).scalar() or 0
+        total_sentences = session.query(func.count(SentenceRecord.id)).scalar() or 0
+        total_vehicles  = session.query(
+            func.count(func.distinct(ArticleRecord.ideology_id))
+        ).scalar() or 0
+        last_updated = session.query(func.max(ArticleRecord.published_at)).scalar()
+
+    data = {
+        "total_articles":  total_articles,
+        "total_sentences": total_sentences,
+        "total_vehicles":  total_vehicles,
+        "last_updated": (
+            last_updated.isoformat()
+            if hasattr(last_updated, "isoformat")
+            else last_updated
+        ) if last_updated else None,
+    }
+    _cache_set("stats", data, _TTL_STATS)
+    return data
+
+
+def _load_vehicles() -> list[dict]:
+    with get_session() as session:
+        records = session.query(VehicleIndexRecord).all()
+        data = [_vehicle_index_to_dict(r) for r in records]
+    if not data:
+        data = _fallback_vehicles()
+    if data:
+        _cache_set("vehicles", data, _TTL_VEHICLES)
+    return data
+
+
+def _load_spectrum() -> list:
+    with get_session() as session:
+        records = session.query(VehicleIndexRecord).all()
+
+    now = datetime.now(timezone.utc)
+    vehicle_indices = {}
+    for r in records:
+        vi = VehicleIndex(
+            source_name=r.source_name,
+            ideology_id=r.ideology_id,
+            window_days=r.window_days,
+            reference_date=r.computed_at or now,
+            article_count=r.article_count,
+            mean_bias=r.mean_bias,
+            median_bias=r.mean_bias,
+            std_bias=0.0,
+            min_bias=0.0,
+            max_bias=2.0,
+            trend=None,
+            window_start=now,
+            window_end=now,
+        )
+        vehicle_indices[r.ideology_id] = vi
+
+    contexts = contextualize_all(vehicle_indices)
+    data = get_spectrum_summary(contexts)
+    if data:
+        _cache_set("spectrum", data, _TTL_SPECTRUM)
+    return data
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _vehicle_index_to_dict(rec: VehicleIndexRecord) -> dict:
@@ -230,26 +299,8 @@ def stats():
     cached = _cache_get("stats")
     if cached is not None:
         return jsonify(cached)
-
     try:
-        with get_session() as session:
-            total_articles  = session.query(func.count(ArticleRecord.url_hash)).scalar() or 0
-            total_sentences = session.query(func.count(SentenceRecord.id)).scalar() or 0
-            total_vehicles  = session.query(
-                func.count(func.distinct(ArticleRecord.ideology_id))
-            ).scalar() or 0
-            last_updated = session.query(func.max(ArticleRecord.published_at)).scalar()
-
-        data = {
-            "total_articles":  total_articles,
-            "total_sentences": total_sentences,
-            "total_vehicles":  total_vehicles,
-            "last_updated": (
-                last_updated.isoformat()
-                if hasattr(last_updated, "isoformat")
-                else last_updated
-            ) if last_updated else None,
-        }
+        return jsonify(_load_stats())
     except Exception:
         logger.exception("DB error em /api/stats — tentando cache stale")
         stale = _cache_stale("stats")
@@ -260,9 +311,6 @@ def stats():
             "total_vehicles": 0, "last_updated": None,
         })
 
-    _cache_set("stats", data, _TTL_STATS)
-    return jsonify(data)
-
 
 @app.get("/api/vehicles")
 def list_vehicles():
@@ -270,23 +318,11 @@ def list_vehicles():
     cached = _cache_get("vehicles")
     if cached is not None:
         return jsonify(cached)
-
     try:
-        with get_session() as session:
-            records = session.query(VehicleIndexRecord).all()
-            data = [_vehicle_index_to_dict(r) for r in records]
+        return jsonify(_load_vehicles())
     except Exception:
         logger.exception("DB error em /api/vehicles — servindo fallback")
         return jsonify(_cache_stale("vehicles") or _fallback_vehicles())
-
-    # DB vazio antes do primeiro pipeline: usa referências estáticas
-    if not data:
-        data = _fallback_vehicles()
-
-    if data:
-        _cache_set("vehicles", data, _TTL_VEHICLES)
-
-    return jsonify(data)
 
 
 @app.get("/api/vehicles/<ideology_id>")
@@ -340,43 +376,11 @@ def spectrum():
     cached = _cache_get("spectrum")
     if cached is not None:
         return jsonify(cached)
-
     try:
-        with get_session() as session:
-            records = session.query(VehicleIndexRecord).all()
+        return jsonify(_load_spectrum())
     except Exception:
         logger.exception("DB error em /api/spectrum")
         return jsonify(_cache_stale("spectrum") or [])
-
-    from aggregation.window_aggregator import VehicleIndex
-    now = datetime.now(timezone.utc)
-
-    vehicle_indices = {}
-    for r in records:
-        vi = VehicleIndex(
-            source_name=r.source_name,
-            ideology_id=r.ideology_id,
-            window_days=r.window_days,
-            reference_date=r.computed_at or now,
-            article_count=r.article_count,
-            mean_bias=r.mean_bias,
-            median_bias=r.mean_bias,
-            std_bias=0.0,
-            min_bias=0.0,
-            max_bias=2.0,
-            trend=None,
-            window_start=now,
-            window_end=now,
-        )
-        vehicle_indices[r.ideology_id] = vi
-
-    contexts = contextualize_all(vehicle_indices)
-    data = get_spectrum_summary(contexts)
-
-    if data:
-        _cache_set("spectrum", data, _TTL_SPECTRUM)
-
-    return jsonify(data)
 
 
 @app.get("/api/articles/<url_hash>/similar")
@@ -565,6 +569,30 @@ def stories():
         if stale:
             return jsonify(stale)
         return jsonify({"stories": [], "ok": False, "error": str(exc)}), 200
+
+
+# ── Pre-warm do cache no startup ──────────────────────────────────────────────
+# Popula stats, vehicles e spectrum em background antes do primeiro request.
+# Garante que a homepage nunca bate no Neon na primeira visita do usuário.
+# Falhas individuais são ignoradas — o endpoint serve stale ou fallback.
+
+def _prewarm() -> None:
+    time.sleep(2)  # aguarda o worker gunicorn/flask terminar de inicializar
+    logger.info("Pre-warm: iniciando cache dos endpoints críticos…")
+    for name, loader in [
+        ("stats",    _load_stats),
+        ("vehicles", _load_vehicles),
+        ("spectrum", _load_spectrum),
+    ]:
+        try:
+            loader()
+            logger.info(f"Pre-warm {name}: OK")
+        except Exception:
+            logger.warning(f"Pre-warm {name}: falhou — será carregado na primeira requisição")
+    logger.info("Pre-warm concluído.")
+
+
+threading.Thread(target=_prewarm, daemon=True).start()
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
