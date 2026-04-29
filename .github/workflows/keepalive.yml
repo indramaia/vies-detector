@@ -1,0 +1,27 @@
+name: Keep-alive — Render + Neon
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # a cada 5 minutos (mínimo do GitHub Actions)
+  workflow_dispatch:         # permite disparar manualmente para teste
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping /api/warmup
+        run: |
+          HTTP=$(curl -s -o /tmp/body.json -w "%{http_code}" \
+            --max-time 30 \
+            https://vies-detector.onrender.com/api/warmup)
+
+          echo "HTTP status: $HTTP"
+          cat /tmp/body.json
+
+          # Falha o job se a API retornou erro (não 2xx) — aparece vermelho no GitHub
+          if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
+            echo "ERRO: API respondeu $HTTP"
+            exit 1
+          fi
