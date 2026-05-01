@@ -9,6 +9,7 @@ Endpoints:
     GET /api/spectrum                  → resumo do espectro ideológico
     GET /api/articles?source=<id>      → artigos recentes de um veículo
     GET /api/stories                   → stories multi-veículo agrupadas por TF-IDF
+    GET /api/topics/<slug>             → stories filtradas por tópico curado (sinônimos)
     GET /api/stats                     → totais para landing page
     GET /api/health                    → status da API + diagnóstico de cache
 
@@ -56,7 +57,7 @@ from flask import Flask, jsonify, request, abort
 from flask_cors import CORS
 from loguru import logger
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from scripts.setup_db import get_session, VehicleIndexRecord, ArticleRecord, SentenceRecord, HomeSummaryRecord
 from ideological import get_spectrum_summary, contextualize_all
 from aggregation import VehicleIndex
@@ -85,6 +86,31 @@ _TTL_STORIES  = 300   #  5 min  — artigos novos chegam com frequência
 _TTL_STATS    = 900   # 15 min
 _TTL_SPECTRUM = 900   # 15 min
 _TTL_ARTICLES = 300   #  5 min
+
+# ── Mapa de sinônimos por tópico curado ───────────────────────────────────────
+# Cada slug mapeia para termos buscados por ILIKE no título dos artigos.
+# Mantido aqui para facilitar manutenção sem alterar lógica de endpoint.
+
+TOPIC_SYNONYMS: dict[str, list[str]] = {
+    "eleicoes-2026":     ["eleições 2026", "eleição 2026", "candidato 2026", "candidatura 2026",
+                          "urna eletrônica", "TSE", "campanha eleitoral 2026"],
+    "stf":               ["STF", "Supremo Tribunal Federal", "Alexandre de Moraes",
+                          "Barroso", "ministro do Supremo"],
+    "lula":              ["Lula", "Luiz Inácio", "presidente Lula", "governo Lula"],
+    "bolsonaro":         ["Bolsonaro", "Jair Bolsonaro", "ex-presidente Bolsonaro", "bolsonarismo"],
+    "reforma-tributaria":["reforma tributária", "reforma fiscal", "IVA", "CBS", "IBS",
+                          "imposto sobre valor agregado"],
+    "petrobras":         ["Petrobras", "combustível", "gasolina", "diesel", "pré-sal"],
+    "banco-central":     ["Banco Central", "Selic", "COPOM", "taxa de juros", "inflação"],
+    "camara":            ["Câmara dos Deputados", "plenário da Câmara", "Arthur Lira",
+                          "votação na Câmara", "deputados federais"],
+    "amazonia":          ["Amazônia", "desmatamento", "queimadas", "floresta amazônica", "bioma"],
+    "pib":               ["PIB", "crescimento econômico", "recessão", "crescimento do Brasil",
+                          "produto interno bruto"],
+    "copa-mundo":        ["Copa do Mundo", "FIFA", "seleção brasileira", "mundial de futebol"],
+    "seguranca-publica": ["segurança pública", "crime organizado", "violência", "milícia",
+                          "tráfico de drogas", "polícia federal"],
+}
 
 
 def _cache_get(key: str):
@@ -681,6 +707,99 @@ def stories():
         if stale:
             return jsonify(stale)
         return jsonify({"stories": [], "ok": False, "error": str(exc)}), 200
+
+
+@app.get("/api/topics/<slug>")
+def topic_stories(slug: str):
+    """
+    Retorna stories (clusters TF-IDF) de artigos sobre um tópico curado.
+
+    O tópico é resolvido a partir de TOPIC_SYNONYMS: cada slug mapeia para
+    termos buscados por ILIKE no título. Evita o OR-lógico excessivo do
+    frontend e garante relevância semântica dos resultados.
+
+    Query params:
+        hours      : janela temporal em horas (padrão: 168 = 7 dias, máx: 720)
+        limit      : número máximo de stories (padrão: 20, máx: 50)
+        threshold  : similaridade TF-IDF mínima, float 0-1 (padrão: 0.15)
+        min_sources: mínimo de veículos distintos por story (padrão: 1)
+    """
+    from aggregation.topic_clusterer import cluster_articles
+
+    terms = TOPIC_SYNONYMS.get(slug)
+    if terms is None:
+        abort(404, description=(
+            f"Tópico '{slug}' não reconhecido. "
+            f"Disponíveis: {sorted(TOPIC_SYNONYMS)}"
+        ))
+
+    try:
+        hours     = min(int(request.args.get("hours",    168)), 720)
+        limit     = min(int(request.args.get("limit",     20)),  50)
+        threshold = float(request.args.get("threshold",  0.15))
+        min_src   = int(request.args.get("min_sources",   1))
+    except (ValueError, TypeError) as exc:
+        return jsonify({"stories": [], "ok": False, "error": f"Parâmetro inválido: {exc}"}), 400
+
+    cache_key = f"topics:{slug}:{hours}:{limit}:{threshold}:{min_src}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+
+    try:
+        _MAX_ARTICLES_TFIDF = 300
+
+        with get_session() as session:
+            records = []
+            effective_hours = hours
+            ilike_filters = [ArticleRecord.title.ilike(f"%{t}%") for t in terms]
+
+            for candidate_hours in [hours, 720, None]:
+                if candidate_hours is not None and candidate_hours < hours:
+                    continue
+                cutoff = (
+                    datetime.now(timezone.utc) - timedelta(hours=candidate_hours)
+                    if candidate_hours is not None else None
+                )
+                q = session.query(ArticleRecord).filter(or_(*ilike_filters))
+                if cutoff is not None:
+                    q = q.filter(ArticleRecord.published_at >= cutoff)
+                q = q.order_by(ArticleRecord.published_at.desc()).limit(_MAX_ARTICLES_TFIDF)
+                records = q.all()
+                effective_hours = candidate_hours
+                if records:
+                    break
+
+            result = cluster_articles(
+                records,
+                similarity_threshold=threshold,
+                min_sources=min_src,
+                max_stories=limit,
+            )
+
+        payload = {
+            "slug": slug,
+            "terms": terms,
+            "stories": result,
+            "total": len(result),
+            "ok": True,
+            "error": None,
+            "effective_hours": effective_hours,
+        }
+        if result:
+            _cache_set(cache_key, payload, _TTL_STORIES)
+        return jsonify(payload)
+
+    except Exception as exc:
+        logger.exception(f"Erro em /api/topics/{slug}")
+        stale = _cache_stale(cache_key)
+        if stale:
+            return jsonify(stale)
+        return jsonify({
+            "slug": slug, "terms": terms,
+            "stories": [], "total": 0,
+            "ok": False, "error": str(exc),
+        }), 200
 
 
 # ── Pre-warm do cache no startup ──────────────────────────────────────────────
