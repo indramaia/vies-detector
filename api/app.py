@@ -211,15 +211,14 @@ def _fallback_vehicles() -> list[dict]:
 def _load_stats() -> dict:
     with get_session() as session:
         row = session.get(HomeSummaryRecord, 1)
-
-    if row is not None:
-        total_articles  = row.total_articles
-        total_sentences = row.total_sentences
-        total_vehicles  = row.total_vehicles
-        last_updated    = row.last_updated
-    else:
-        # Fallback: home_summary ainda não existe (pipeline nunca rodou)
-        with get_session() as session:
+        # Lê atributos dentro da sessão — evita DetachedInstanceError
+        if row is not None:
+            total_articles  = row.total_articles
+            total_sentences = row.total_sentences
+            total_vehicles  = row.total_vehicles
+            last_updated    = row.last_updated
+        else:
+            # Fallback: home_summary ainda não existe (pipeline nunca rodou)
             total_articles  = session.query(func.count(ArticleRecord.url_hash)).scalar() or 0
             total_sentences = session.query(func.count(SentenceRecord.id)).scalar() or 0
             total_vehicles  = session.query(
@@ -255,18 +254,30 @@ def _load_vehicles() -> list[dict]:
 def _load_spectrum() -> list:
     with get_session() as session:
         records = session.query(VehicleIndexRecord).all()
+        # Extrai para dicts dentro da sessão — evita DetachedInstanceError
+        rows = [
+            {
+                "source_name":  r.source_name,
+                "ideology_id":  r.ideology_id,
+                "window_days":  r.window_days,
+                "computed_at":  r.computed_at,
+                "article_count": r.article_count,
+                "mean_bias":    r.mean_bias,
+            }
+            for r in records
+        ]
 
     now = datetime.now(timezone.utc)
     vehicle_indices = {}
-    for r in records:
+    for r in rows:
         vi = VehicleIndex(
-            source_name=r.source_name,
-            ideology_id=r.ideology_id,
-            window_days=r.window_days,
-            reference_date=r.computed_at or now,
-            article_count=r.article_count,
-            mean_bias=r.mean_bias,
-            median_bias=r.mean_bias,
+            source_name=r["source_name"],
+            ideology_id=r["ideology_id"],
+            window_days=r["window_days"],
+            reference_date=r["computed_at"] or now,
+            article_count=r["article_count"],
+            mean_bias=r["mean_bias"],
+            median_bias=r["mean_bias"],
             std_bias=0.0,
             min_bias=0.0,
             max_bias=2.0,
@@ -274,7 +285,7 @@ def _load_spectrum() -> list:
             window_start=now,
             window_end=now,
         )
-        vehicle_indices[r.ideology_id] = vi
+        vehicle_indices[r["ideology_id"]] = vi
 
     contexts = contextualize_all(vehicle_indices)
     data = get_spectrum_summary(contexts)
