@@ -1,13 +1,16 @@
 """
 collector/sources.py
 ────────────────────
-Catálogo de feeds RSS dos veículos monitorados.
+Catálogo de fontes dos veículos monitorados.
 
 Estrutura de cada entrada:
-    name        : nome canônico do veículo
-    url         : URL do feed RSS
-    ideology_id : chave que referencia ideological/data/ideological_references.json
-    active      : se False, o coletor ignora o veículo
+    name            : nome canônico do veículo
+    url             : URL do feed RSS (string vazia para fontes homepage-based)
+    ideology_id     : chave que referencia ideological/data/ideological_references.json
+    active          : se False, o coletor ignora o veículo
+    scraping        : False quando URLs do feed não são scrapeáveis diretamente
+    homepage_url    : URL da homepage para extração de links (substitui RSS quando definida)
+    article_url_re  : regex que identifica URLs de artigos na homepage
 """
 
 from __future__ import annotations
@@ -20,7 +23,9 @@ class NewsSource:
     url: str
     ideology_id: str
     active: bool = True
-    scraping: bool = True  # False quando URLs do feed não são scrapeáveis diretamente
+    scraping: bool = True        # False quando URLs do feed não são scrapeáveis diretamente
+    homepage_url: str | None = None     # URL da homepage quando RSS não está disponível
+    article_url_re: str | None = None   # regex para identificar artigos na homepage
 
 
 # ── Veículos monitorados ──────────────────────────────────────────────────────
@@ -89,8 +94,11 @@ SOURCES: list[NewsSource] = [
     ),
     NewsSource(
         name="R7",
-        url="http://www.r7.com/institucional/rss",
+        url="",   # RSS descontinuado — coleta via homepage
         ideology_id="r7",
+        homepage_url="https://noticias.r7.com/",
+        # artigos terminam com data no formato DDMMYYYY antes da barra final
+        article_url_re=r"https://noticias\.r7\.com/[a-z][a-z-]*/[a-z0-9][a-z0-9-]+-\d{8}/?$",
     ),
     NewsSource(
         name="El País Brasil",

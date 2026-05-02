@@ -23,7 +23,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+import re as _re
+
 import feedparser
+from bs4 import BeautifulSoup as _BeautifulSoup
 from loguru import logger
 
 from .article_scraper import scrape_article
@@ -192,6 +195,145 @@ def _extract_text(entry: feedparser.FeedParserDict) -> str:
 
 
 # ──────────────────────────────────────────────────────────────────
+# Homepage-based collection (fontes sem RSS)
+# ──────────────────────────────────────────────────────────────────
+
+def _slug_to_title(url: str) -> str:
+    """Converte o slug da URL em título legível como fallback."""
+    slug = url.rstrip("/").split("/")[-1]
+    slug = _re.sub(r"-\d{8}$", "", slug)   # remove data DDMMYYYY do final
+    return slug.replace("-", " ").capitalize()
+
+
+def _fetch_homepage_source(
+    source: NewsSource,
+    deduplicator: Deduplicator,
+    enable_scraping: bool = True,
+) -> list[ArticleData]:
+    """
+    Coleta artigos de um veículo sem RSS raspando links da homepage.
+
+    Fluxo:
+        1. GET na homepage → extrai todos os <a href>
+        2. Filtra URLs que batem com source.article_url_re
+        3. Deduplicação por hash
+        4. Scraping paralelo de cada artigo (mesmo pipeline do RSS)
+        5. Retorna lista de ArticleData prontos para classificação
+    """
+    logger.info(f"[{source.name}] Coletando via homepage: {source.homepage_url}")
+
+    try:
+        resp = _requests.get(source.homepage_url, headers=_FEED_HEADERS, timeout=_FEED_TIMEOUT)
+        resp.raise_for_status()
+    except Exception as exc:
+        logger.error(f"[{source.name}] Falha ao buscar homepage: {exc}")
+        return []
+
+    soup = _BeautifulSoup(resp.text, "html.parser")
+    pattern = _re.compile(source.article_url_re) if source.article_url_re else None
+
+    seen: set[str] = set()
+    candidates: list[tuple[str, str, datetime]] = []   # (url, título, pub)
+
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if pattern and not pattern.search(href):
+            continue
+        if href in seen:
+            continue
+        seen.add(href)
+
+        # Título: texto do link; fallback = slug legível
+        title = a.get_text(" ", strip=True)
+        if len(title) < 15:
+            title = _slug_to_title(href)
+
+        # Data: extrai DDMMYYYY do final da URL
+        pub = datetime.now(timezone.utc)
+        if dm := _re.search(r"(\d{2})(\d{2})(\d{4})/?$", href):
+            try:
+                pub = datetime(
+                    int(dm.group(3)), int(dm.group(2)), int(dm.group(1)),
+                    tzinfo=timezone.utc,
+                )
+            except ValueError:
+                pass
+
+        candidates.append((href, title, pub))
+
+    if not candidates:
+        logger.warning(f"[{source.name}] Nenhum artigo encontrado na homepage.")
+        return []
+
+    # Deduplicação
+    pending: list[tuple[str, str, str, datetime]] = []  # (url_hash, url, título, pub)
+    for url, title, pub in candidates:
+        if deduplicator.is_duplicate(url):
+            continue
+        url_hash = deduplicator.register(url)
+        pending.append((url_hash, url, title, pub))
+
+    duplicate_count = len(candidates) - len(pending)
+    if not pending:
+        logger.info(f"[{source.name}] Todos os artigos já registrados.")
+        return []
+
+    # Scraping paralelo — idêntico ao fluxo RSS
+    scrape_map: dict[str, dict] = {}
+    scraped_count = 0
+    if enable_scraping:
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            future_to_url = {
+                pool.submit(scrape_article, url): url
+                for _, url, _, _ in pending
+            }
+            for future in as_completed(future_to_url):
+                url = future_to_url[future]
+                try:
+                    result = future.result()
+                except Exception:
+                    result = {"full_text": "", "image_url": None, "ok": False}
+                scrape_map[url] = result
+                if result["ok"]:
+                    scraped_count += 1
+
+    # Construção dos ArticleData
+    articles: list[ArticleData] = []
+    for url_hash, url, title, pub in pending:
+        scrape_result = scrape_map.get(url, {})
+        ok        = scrape_result.get("ok", False)
+        full_text = scrape_result.get("full_text", "") if ok else ""
+        image_url = scrape_result.get("image_url")
+
+        processed = preprocess_article("", full_text)
+        if processed["sentence_count"] == 0:
+            logger.debug(f"[{source.name}] Artigo sem sentenças válidas: {url}")
+            continue
+
+        articles.append(ArticleData(
+            url_hash=url_hash,
+            url=url,
+            title=title,
+            source_name=source.name,
+            ideology_id=source.ideology_id,
+            published_at=pub,
+            snippet=processed["snippet"],
+            sentences=processed["sentences"],
+            sentence_count=processed["sentence_count"],
+            image_url=image_url,
+            scraped=ok,
+        ))
+
+    if duplicate_count:
+        logger.debug(f"[{source.name}] {duplicate_count} duplicatas ignoradas.")
+    logger.info(
+        f"[{source.name}] {len(articles)} artigos novos "
+        f"({scraped_count} com corpo completo raspado)."
+    )
+    return articles
+
+
+# ──────────────────────────────────────────────────────────────────
 # Public API
 # ──────────────────────────────────────────────────────────────────
 def fetch_feed(
@@ -214,6 +356,9 @@ def fetch_feed(
     Returns:
         Lista de ArticleData novos (não duplicados).
     """
+    if source.homepage_url:
+        return _fetch_homepage_source(source, deduplicator, enable_scraping)
+
     logger.info(f"[{source.name}] Coletando feed: {source.url}")
 
     feed = _fetch_feed_robust(source)
