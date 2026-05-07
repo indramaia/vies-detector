@@ -359,12 +359,26 @@ Tempo de treinamento: ~1h28min (CPU) · 5 épocas · batch efetivo 32
 
 ## 📜 Referências Principais
 
-- SOUZA et al. BERTimbau (2020)
-- VARGAS et al. FactNews (2023)
-- ENTMAN, R. Framing Theory (1993)
-- PANG, B.; LEE, L. Opinion Mining and Sentiment Analysis (2008)
-- GEIRHOS et al. Shortcut Learning (2020)
+**Enquadramento & Agenda-Setting**
+- ENTMAN, R. M. Framing: Toward Clarification of a Fractured Paradigm. *Journal of Communication*, v. 43, n. 4, p. 51–58, 1993.
+- McCOMBS, M. E.; SHAW, D. L. The Agenda-Setting Function of Mass Media. *Public Opinion Quarterly*, v. 36, n. 2, p. 176–187, 1972.
 
+**Análise de Sentimento e Subjetividade**
+- PANG, B.; LEE, L. Opinion Mining and Sentiment Analysis. *Foundations and Trends in Information Retrieval*, v. 2, n. 1–2, p. 1–135, 2008.
+- LIU, B. Sentiment Analysis and Opinion Mining. *Synthesis Lectures on Human Language Technologies*, v. 5, n. 1, p. 1–167, 2012.
+
+**Modelos de Linguagem Pré-treinados**
+- SOUZA, F. et al. BERTimbau: Pretrained BERT Models for Brazilian Portuguese. *BRACIS*, 2020.
+- VARGAS, F. et al. FactNews: A Dataset for Fake News Detection and Bias Analysis in Brazilian Portuguese. 2023.
+
+**Bias Detection em Mídia**
+- BALY, R. et al. Predicting Factuality of Reporting and Bias of News Media Sources. *EMNLP*, 2018. MIT/QCRI.
+- SPINDE, T. et al. MBIC: A Media Bias Annotation Dataset Including Annotator Characteristics. *ICWSM*, 2021.
+
+**Engenharia de ML e PLN**
+- SCULLEY, D. et al. Hidden Technical Debt in Machine Learning Systems. *NeurIPS*, 2015.
+- BIRD, S.; LOPER, E. NLTK: The Natural Language Toolkit. *ACL*, 2004.
+- GEIRHOS, R. et al. Shortcut Learning in Deep Neural Networks. *Nature Machine Intelligence*, v. 2, p. 665–673, 2020.
 ---
 
 ## Licença
