@@ -379,7 +379,6 @@ Tempo de treinamento: ~1h28min (CPU) · 5 épocas · batch efetivo 32
 - SCULLEY, D. et al. Hidden Technical Debt in Machine Learning Systems. *NeurIPS*, 2015.
 - BIRD, S.; LOPER, E. NLTK: The Natural Language Toolkit. *ACL*, 2004.
 - GEIRHOS, R. et al. Shortcut Learning in Deep Neural Networks. *Nature Machine Intelligence*, v. 2, p. 665–673, 2020.
-
 ---
 
 ## Licença
