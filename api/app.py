@@ -12,6 +12,8 @@ Endpoints:
     GET /api/topics/<slug>             → stories filtradas por tópico curado (sinônimos)
     GET /api/stats                     → totais para landing page
     GET /api/health                    → status da API + diagnóstico de cache
+    POST /api/analyze                  → inicia análise avulsa (dispara GitHub Actions)
+    GET /api/analyze/<url_hash>        → status/resultado de análise avulsa
 
 Todos os endpoints retornam JSON com cabeçalho CORS.
 
@@ -40,6 +42,7 @@ proteção implementadas:
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 import time
@@ -58,7 +61,11 @@ from flask_cors import CORS
 from loguru import logger
 
 from sqlalchemy import func, or_
-from scripts.setup_db import get_session, VehicleIndexRecord, ArticleRecord, SentenceRecord, HomeSummaryRecord
+from scripts.setup_db import (
+    get_session, init_db,
+    VehicleIndexRecord, ArticleRecord, SentenceRecord, HomeSummaryRecord,
+    OnDemandRequest,
+)
 from ideological import get_spectrum_summary, contextualize_all
 from aggregation import VehicleIndex
 
@@ -802,6 +809,165 @@ def topic_stories(slug: str):
         }), 200
 
 
+# ── Análise avulsa (on-demand) ────────────────────────────────────────────────
+
+_GH_REPO     = os.getenv("GH_REPO", "indramaia/vies-detector")
+_WORKFLOW_ID = "analyze_url.yml"
+
+
+def _trigger_workflow(url: str, url_hash: str) -> None:
+    """Dispara workflow_dispatch no GitHub Actions para análise de URL avulsa."""
+    import requests as _req
+
+    token = os.getenv("GH_TOKEN")
+    if not token:
+        raise RuntimeError(
+            "GH_TOKEN não configurado — análise avulsa indisponível."
+        )
+
+    resp = _req.post(
+        f"https://api.github.com/repos/{_GH_REPO}/actions/workflows"
+        f"/{_WORKFLOW_ID}/dispatches",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept":        "application/vnd.github.v3+json",
+            "Content-Type":  "application/json",
+        },
+        json={"ref": "main", "inputs": {"url": url, "url_hash": url_hash}},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    logger.info(f"Workflow disparado para url_hash={url_hash[:8]}…")
+
+
+@app.post("/api/analyze")
+def analyze_url_endpoint():
+    """
+    Inicia análise de viés de um artigo avulso via GitHub Actions.
+
+    Body JSON:
+        { "url": "https://..." }
+
+    Fluxo:
+        1. Valida URL e calcula url_hash (SHA-256).
+        2. Se artigo já está no banco → retorna resultado imediato.
+        3. Se pedido já está pending/processing → retorna status atual.
+        4. Registra OnDemandRequest(pending) no banco.
+        5. Dispara workflow_dispatch no GitHub Actions.
+        6. Retorna 202 com url_hash para polling.
+
+    O cliente deve fazer polling em GET /api/analyze/<url_hash> até
+    status == "completed" | "failed" (latência típica: 3-7 min).
+    """
+    data = request.get_json(silent=True) or {}
+    url  = (data.get("url") or "").strip()
+
+    if not url:
+        abort(400, description="Campo 'url' obrigatório.")
+    if not url.startswith(("http://", "https://")):
+        abort(400, description="URL deve começar com http:// ou https://.")
+    if len(url) > 2048:
+        abort(400, description="URL muito longa (máx 2048 chars).")
+
+    url_hash = hashlib.sha256(url.encode()).hexdigest()
+
+    # Cache hit: artigo já analisado
+    try:
+        with get_session() as session:
+            article = session.get(ArticleRecord, url_hash)
+            if article and article.bias_score is not None:
+                return jsonify({
+                    "status":  "completed",
+                    "article": _article_to_dict(article),
+                })
+
+            req = session.get(OnDemandRequest, url_hash)
+            if req and req.status in ("pending", "processing"):
+                return jsonify({
+                    "status":   req.status,
+                    "url_hash": url_hash,
+                    "message":  "Análise já em andamento.",
+                })
+    except Exception:
+        logger.exception("DB error ao verificar url_hash em POST /api/analyze")
+
+    # Registra pedido no banco
+    try:
+        with get_session() as session:
+            session.merge(OnDemandRequest(
+                url_hash=url_hash,
+                url=url,
+                status="pending",
+                requested_at=datetime.now(timezone.utc),
+            ))
+    except Exception:
+        logger.exception("Erro ao registrar OnDemandRequest")
+        abort(503, description="Erro ao registrar pedido de análise.")
+
+    # Dispara GitHub Actions
+    try:
+        _trigger_workflow(url, url_hash)
+    except Exception as exc:
+        logger.exception("Erro ao disparar workflow")
+        try:
+            with get_session() as session:
+                req = session.get(OnDemandRequest, url_hash)
+                if req:
+                    req.status = "failed"
+                    req.error  = str(exc)[:500]
+        except Exception:
+            pass
+        abort(503, description="Não foi possível iniciar a análise. Tente novamente.")
+
+    return jsonify({
+        "status":   "pending",
+        "url_hash": url_hash,
+        "poll_url": f"/api/analyze/{url_hash}",
+        "message":  "Análise iniciada — tempo estimado: 3-7 minutos.",
+    }), 202
+
+
+@app.get("/api/analyze/<url_hash>")
+def get_analysis_status(url_hash: str):
+    """
+    Retorna o status ou o resultado de uma análise iniciada com POST /api/analyze.
+
+    Possíveis retornos:
+        { "status": "pending" | "processing" }
+        { "status": "failed",    "error": "..." }
+        { "status": "completed", "article": { BiasScore + metadados } }
+    """
+    if len(url_hash) != 64 or not all(c in "0123456789abcdef" for c in url_hash):
+        abort(400, description="url_hash inválido.")
+
+    try:
+        with get_session() as session:
+            article = session.get(ArticleRecord, url_hash)
+            if article and article.bias_score is not None:
+                return jsonify({
+                    "status":  "completed",
+                    "article": _article_to_dict(article),
+                })
+
+            req = session.get(OnDemandRequest, url_hash)
+            if req is None:
+                abort(404, description="Análise não encontrada.")
+
+            payload: dict = {
+                "status":       req.status,
+                "url_hash":     url_hash,
+                "url":          req.url,
+                "requested_at": req.requested_at.isoformat() if req.requested_at else None,
+            }
+            if req.status == "failed":
+                payload["error"] = req.error
+            return jsonify(payload)
+
+    except Exception:
+        logger.exception(f"DB error em GET /api/analyze/{url_hash}")
+        abort(503, description="Serviço temporariamente indisponível.")
+
+
 # ── Pre-warm do cache no startup ──────────────────────────────────────────────
 # Popula stats, vehicles e spectrum em background antes do primeiro request.
 # Garante que a homepage nunca bate no Neon na primeira visita do usuário.
@@ -809,6 +975,11 @@ def topic_stories(slug: str):
 
 def _prewarm() -> None:
     time.sleep(2)  # aguarda o worker gunicorn/flask terminar de inicializar
+    try:
+        init_db()  # cria tabelas novas sem destruir existentes (idempotente)
+        logger.info("Pre-warm: init_db OK")
+    except Exception:
+        logger.warning("Pre-warm: init_db falhou — tabelas podem estar desatualizadas")
     logger.info("Pre-warm: iniciando cache dos endpoints críticos…")
     for name, loader in [
         ("stats",    _load_stats),

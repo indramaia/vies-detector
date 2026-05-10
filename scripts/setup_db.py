@@ -163,6 +163,21 @@ class HomeSummaryRecord(Base):
     last_updated    = Column(DateTime, nullable=True)
 
 
+class OnDemandRequest(Base):
+    """
+    Pedidos de análise avulsa via POST /api/analyze.
+    Ciclo de vida: pending → processing → completed | failed.
+    """
+    __tablename__ = "on_demand_requests"
+
+    url_hash     = Column(String(64), primary_key=True)
+    url          = Column(Text, nullable=False)
+    status       = Column(String(16), nullable=False, default="pending")
+    requested_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    error        = Column(String(500), nullable=True)
+
+
 # ── Utilitários ───────────────────────────────────────────────────────────────
 
 def init_db() -> None:

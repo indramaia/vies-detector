@@ -143,6 +143,23 @@ def _extract_image(soup: BeautifulSoup, base_url: str) -> str | None:
     return None
 
 
+def _extract_title(soup: BeautifulSoup) -> str | None:
+    """Extrai o título do artigo (og:title → h1 → <title>)."""
+    og = soup.find("meta", property="og:title")
+    if og and og.get("content"):
+        return og["content"].strip()
+
+    h1 = soup.find("h1")
+    if h1:
+        return h1.get_text(strip=True)
+
+    title_tag = soup.find("title")
+    if title_tag:
+        return title_tag.get_text(strip=True)
+
+    return None
+
+
 def scrape_article(url: str) -> dict:
     """
     Faz GET no URL do artigo e extrai corpo completo + imagem numa única
@@ -206,15 +223,16 @@ def scrape_article(url: str) -> dict:
         soup      = BeautifulSoup(resp.text, "html.parser")
         full_text = _extract_body(soup)
         image_url = _extract_image(soup, url)
+        title     = _extract_title(soup)
 
         if full_text:
-            return {"full_text": full_text, "image_url": image_url, "ok": True, "reason": None}
+            return {"full_text": full_text, "image_url": image_url, "title": title, "ok": True, "reason": None}
 
         reason = _detect_no_body_reason(soup)
         logger.debug(f"Scrape sem corpo [{url}]: {reason}")
-        return {"full_text": "", "image_url": image_url, "ok": False, "reason": reason}
+        return {"full_text": "", "image_url": image_url, "title": title, "ok": False, "reason": reason}
 
     except Exception as exc:
         reason = f"parse HTML: {type(exc).__name__}"
         logger.debug(f"Parse HTML falhou [{url}]: {reason}")
-        return {"full_text": "", "image_url": None, "ok": False, "reason": reason}
+        return {"full_text": "", "image_url": None, "title": None, "ok": False, "reason": reason}
