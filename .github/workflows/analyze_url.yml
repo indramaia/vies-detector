@@ -1,0 +1,48 @@
+name: Analyze URL on Demand
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "URL do artigo a analisar"
+        required: true
+        type: string
+      url_hash:
+        description: "SHA-256 hex da URL (gerado pela API)"
+        required: true
+        type: string
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Baixar modelo do HuggingFace Hub
+        run: |
+          python -c "
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              repo_id='IndraSeixas/bertimbau-bias',
+              local_dir='models/bertimbau-bias',
+          )
+          print('Modelo baixado com sucesso.')
+          "
+
+      - name: Analisar artigo
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PIPELINE_MODE: "1"
+        run: |
+          python scripts/analyze_single_url.py \
+            --url "${{ inputs.url }}" \
+            --url_hash "${{ inputs.url_hash }}"
