@@ -88,7 +88,7 @@ CORS(app, resources={r"/api/*": {"origins": ALLOWED_ORIGINS}})
 _CACHE: dict[str, tuple[float, object]] = {}  # key → (expires_monotonic, payload)
 _CACHE_LOCK = RLock()
 
-_TTL_VEHICLES = 900   # 15 min  — pipeline roda a cada 12 h; dados mudam pouco
+_TTL_VEHICLES = 900   # 15 min  — pipeline roda a cada 6h; dados mudam pouco
 _TTL_STORIES  = 300   #  5 min  — artigos novos chegam com frequência
 _TTL_STATS    = 900   # 15 min
 _TTL_SPECTRUM = 900   # 15 min
