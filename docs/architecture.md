@@ -54,14 +54,13 @@
 - `bias_score.py` — fórmula: `(1×n_env + 2×n_fort) / n_total` → [0, 2]
 - `window_aggregator.py` — média, mediana, desvio padrão por veículo em janela temporal
 
-**Faixas interpretativas:**
+**Faixas interpretativas (espelham as 3 classes do modelo):**
 
-| Faixa      | Interpretação                    |
-|------------|----------------------------------|
-| 0.0 – 0.4  | Predominantemente factual        |
-| 0.4 – 0.8  | Viés moderado                    |
-| 0.8 – 1.4  | Viés elevado                     |
-| 1.4 – 2.0  | Linguagem fortemente enviesada   |
+| Faixa         | Interpretação             |
+|---------------|---------------------------|
+| 0.00 – 0.67   | Factual                   |
+| 0.67 – 1.33   | Enviesada                 |
+| 1.33 – 2.00   | Fortemente enviesada      |
 
 ## Camada 4 — Ideological
 
@@ -90,6 +89,8 @@
 | GET    | `/api/vehicles/<id>`          | Índice de um veículo               |
 | GET    | `/api/spectrum`               | Espectro ideológico ordenado       |
 | GET    | `/api/articles?source=<id>`   | Artigos recentes por veículo       |
+| GET    | `/api/stats`                  | Totais gerais (artigos, sentenças) |
+| GET    | `/api/stories`                | Stories multi-veículo por TF-IDF   |
 
 ## Limitações Documentadas
 

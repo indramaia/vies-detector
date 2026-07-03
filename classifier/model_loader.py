@@ -31,6 +31,7 @@ DEFAULT_MODEL_PATH = os.getenv(
     "MODEL_PATH",
     "models/bertimbau-bias"  # modelo fine-tuned no FactNews
 )
+HF_MODEL_REPO = "IndraSeixas/bertimbau-bias"  # fallback público no HuggingFace Hub
 
 # Mapeamento de rótulos conforme remapeamento do FactNews
 # (VARGAS et al., 2023): -1 → 2, 0 → 0, 1 → 1
@@ -70,20 +71,21 @@ def load_model(model_path: str = DEFAULT_MODEL_PATH) -> tuple[PreTrainedModel, P
     path = Path(model_path)
     if path.exists():
         logger.info(f"Carregando modelo local: {model_path}")
+        source = model_path
     else:
         logger.warning(
             f"Modelo local não encontrado em '{model_path}'. "
-            "Usando modelo base do HuggingFace (sem fine-tuning). "
-            "Execute classifier/train.py para gerar o modelo ajustado."
+            f"Baixando modelo fine-tuned do HuggingFace Hub: {HF_MODEL_REPO}"
         )
+        source = HF_MODEL_REPO
 
     tokenizer = AutoTokenizer.from_pretrained(
-        model_path,
+        source,
         use_fast=True,
     )
 
     model = AutoModelForSequenceClassification.from_pretrained(
-        model_path,
+        source,
         num_labels=NUM_LABELS,
         id2label=ID2LABEL,
         label2id=LABEL2ID,

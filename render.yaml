@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: vies-detector-api
+    runtime: python
+    buildCommand: pip install -r requirements-api.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --worker-class gthread --threads 4 api.app:app
+    healthCheckPath: /api/health
+    buildFilter:
+      paths:
+        - api/**
+        - scripts/setup_db.py
+        - aggregation/**
+        - ideological/**
+        - requirements-api.txt
+        - Procfile
+        - render.yaml

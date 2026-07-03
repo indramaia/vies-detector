@@ -72,14 +72,14 @@ def remove_urls(text: str) -> str:
 
 
 def clean_text(raw: str) -> str:
-    """
-    Pipeline completo de limpeza:
-        HTML → URLs → espaços → truncamento LGPD
-    """
+    """Limpeza sem truncamento — para classificação do texto completo."""
     text = strip_html(raw)
     text = remove_urls(text)
-    text = normalize_whitespace(text)
-    # Truncamento: nunca armazenamos mais de MAX_SNIPPET_CHARS (LGPD)
+    return normalize_whitespace(text)
+
+
+def make_snippet(text: str) -> str:
+    """Trunca para MAX_SNIPPET_CHARS (conformidade LGPD) para armazenamento."""
     return text[:MAX_SNIPPET_CHARS]
 
 
@@ -104,16 +104,27 @@ def tokenize_sentences(text: str) -> list[str]:
     ]
 
 
-def preprocess_article(raw_text: str) -> dict:
+def preprocess_article(rss_text: str, full_text: str = "") -> dict:
     """
-    Pré-processa um artigo completo.
+    Pré-processa um artigo combinando texto RSS e corpo completo raspado.
+
+    Args:
+        rss_text  : texto extraído do feed RSS (summary/content)
+        full_text : corpo completo raspado da página (opcional).
+                    Usado para classificação — NUNCA persistido integralmente.
 
     Retorna:
-        snippet   : trecho limpo (≤ MAX_SNIPPET_CHARS) para armazenamento
-        sentences : lista de sentenças para o classificador
+        snippet        : trecho limpo (≤ MAX_SNIPPET_CHARS) — armazenado no DB
+        sentences      : sentenças do texto completo — para o classificador
+        sentence_count : número de sentenças
     """
-    snippet = clean_text(raw_text)
-    sentences = tokenize_sentences(snippet)
+    rss_clean  = clean_text(rss_text)
+    snippet    = make_snippet(rss_clean)
+
+    # Sentenças para classificação: texto completo se disponível, senão snippet
+    classify_source = clean_text(full_text) if full_text.strip() else rss_clean
+    sentences = tokenize_sentences(classify_source)
+
     return {
         "snippet": snippet,
         "sentences": sentences,
