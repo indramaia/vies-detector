@@ -88,11 +88,11 @@ CORS(app, resources={r"/api/*": {"origins": ALLOWED_ORIGINS}})
 _CACHE: dict[str, tuple[float, object]] = {}  # key → (expires_monotonic, payload)
 _CACHE_LOCK = RLock()
 
-_TTL_VEHICLES = 900   # 15 min  — pipeline roda a cada 6h; dados mudam pouco
-_TTL_STORIES  = 300   #  5 min  — artigos novos chegam com frequência
-_TTL_STATS    = 900   # 15 min
-_TTL_SPECTRUM = 900   # 15 min
-_TTL_ARTICLES = 300   #  5 min
+_TTL_VEHICLES = 21600  # 6h — alinhado ao ciclo do pipeline; dados só mudam quando pipeline roda
+_TTL_STORIES  =  1800  # 30 min
+_TTL_STATS    = 21600  # 6h
+_TTL_SPECTRUM = 21600  # 6h
+_TTL_ARTICLES =  1800  # 30 min
 
 # ── Mapa de sinônimos por tópico curado ───────────────────────────────────────
 # Cada slug mapeia para termos buscados por ILIKE no título dos artigos.
@@ -407,15 +407,16 @@ def health():
 @app.get("/api/warmup")
 def warmup():
     """
-    Keep-alive chamado por cron externo (GitHub Actions / cron-job.org) a cada 5 min.
+    Keep-alive para o Render (evita spin-down do dyno gratuito após 15 min).
 
     Comportamento:
       - Se algum cache crítico expirou → recarrega do Neon (toca o banco).
-      - Se todos os caches estão válidos → faz SELECT 1 para manter Neon acordado.
-    Retorna diagnóstico de cache para monitoramento nos logs do cron.
-    """
-    from sqlalchemy import text
+      - Se todos os caches estão válidos → retorna imediatamente sem tocar o banco.
 
+    O Neon deve auto-suspender livremente entre execuções do pipeline — não
+    fazemos SELECT 1 de keepalive porque isso esgotaria a quota de compute do
+    free tier (~191h/mês) antes do fim do mês.
+    """
     refreshed = []
     errors = []
 
@@ -431,15 +432,6 @@ def warmup():
             except Exception as exc:
                 logger.warning(f"Warmup: falhou ao recarregar '{name}': {exc}")
                 errors.append(name)
-
-    if not refreshed and not errors:
-        # Caches válidos — ping mínimo para manter Neon fora do autosuspend
-        try:
-            with get_session() as session:
-                session.execute(text("SELECT 1"))
-        except Exception as exc:
-            logger.warning(f"Warmup: ping Neon falhou: {exc}")
-            errors.append("neon_ping")
 
     return jsonify({
         "status": "ok" if not errors else "degraded",

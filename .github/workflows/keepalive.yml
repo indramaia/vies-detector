@@ -1,8 +1,8 @@
-name: Keep-alive — Render + Neon
+name: Keep-alive — Render
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # a cada 15 min — permite Neon auto-suspender entre pings
+    - cron: '*/14 * * * *'  # a cada 14 min — mantém dyno Render ativo (free tier dorme após 15 min)
   workflow_dispatch:         # permite disparar manualmente para teste
 
 jobs:
