@@ -86,6 +86,39 @@ def task_classify(articles: list[ArticleData]) -> list[ArticleBiasResult]:
 
 _MAX_SENTENCES_CLASSIFY = 100 # primeiras N sentenças por artigo — jornalismo concentra viés no lide
 
+_RETENTION_DAYS = 45  # window_days (30) + margem — nada no app consulta artigos mais antigos que isso
+
+
+def task_purge_old_data(db_session, retention_days: int = _RETENTION_DAYS) -> None:
+    """Remove artigos e sentenças mais antigos que retention_days.
+
+    Sem isso o banco cresce sem limite: sentences guarda o texto de cada
+    sentença classificada para sempre, e é o que domina o tamanho do banco.
+    O Neon free tier tem teto de 512 MB, e nenhuma consulta do app (agregação,
+    API) olha além de window_days — então dados antigos não têm função.
+    Roda antes da coleta, na mesma sessão que lê os hashes existentes.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+
+    old_hashes = db_session.query(ArticleRecord.url_hash).filter(
+        ArticleRecord.published_at < cutoff
+    )
+    n_sentences = (
+        db_session.query(SentenceRecord)
+        .filter(SentenceRecord.url_hash.in_(old_hashes))
+        .delete(synchronize_session=False)
+    )
+    n_articles = (
+        db_session.query(ArticleRecord)
+        .filter(ArticleRecord.published_at < cutoff)
+        .delete(synchronize_session=False)
+    )
+    db_session.commit()
+    logger.info(
+        f"Retenção ({retention_days}d) — removidos {n_articles} artigos e "
+        f"{n_sentences} sentenças anteriores a {cutoff.date()}."
+    )
+
 
 def _clean(value: str | None) -> str | None:
     """Remove bytes nulos (\x00) que o PostgreSQL rejeita em string literals."""
@@ -98,11 +131,15 @@ def task_persist(
     articles: list[ArticleData],
     bias_results: list[ArticleBiasResult],
     db_session,
-) -> None:
+) -> tuple[int, int]:
     """Persiste metadados, resultados de artigos e sentenças no banco.
 
     bulk_insert_mappings envia todos os registros em dois round-trips ao Neon
     (artigos + sentenças), eliminando os ~10.000 round-trips individuais do ORM.
+
+    Retorna (artigos_inseridos, sentenças_inseridas) — usado por
+    task_update_home_summary para manter o contador cumulativo, já que
+    a retenção (task_purge_old_data) remove linhas da tabela ao longo do tempo.
     """
     bias_map = {r.url_hash: r for r in bias_results}
 
@@ -150,6 +187,7 @@ def task_persist(
 
     db_session.commit()
     logger.info(f"Persistidos {len(article_rows)} artigos e {len(sentence_rows)} sentenças no banco.")
+    return len(article_rows), len(sentence_rows)
 
 
 def task_aggregate_contextualize(
@@ -234,17 +272,30 @@ def task_aggregate_contextualize(
 # Fique ok > baixa o app, liga o 0800, whatsapp. 
 # nutricionista, psicólogo, 
 
-def task_update_home_summary(db_session) -> None:
-    """Pré-calcula totais da homepage e grava em home_summary (upsert id=1).
+def task_update_home_summary(db_session, new_articles: int = 0, new_sentences: int = 0) -> None:
+    """Atualiza os totais cumulativos da homepage (upsert id=1).
 
-    Chamada uma vez ao final do pipeline — a API lê essa linha com um SELECT
-    simples em vez de 4 COUNT(*) na tabela de artigos a cada expiração de cache.
+    total_articles/total_sentences são um CONTADOR CUMULATIVO — soma new_articles/
+    new_sentences ao valor já gravado, em vez de recalcular via COUNT(*) na tabela.
+    Isso é proposital: desde que task_purge_old_data passou a apagar dados com
+    mais de _RETENTION_DAYS dias, COUNT(*) refletiria só a janela viva, e esse
+    número aparece no frontend como "sentenças já classificadas" — uma métrica
+    de vitrine que não pode regredir a cada purga.
+
+    total_vehicles usa max() pelo mesmo motivo: não deve cair só porque um
+    veículo ficou temporariamente fora da janela de retenção.
     """
-    total_articles  = db_session.query(func.count(ArticleRecord.url_hash)).scalar() or 0
-    total_sentences = db_session.query(func.count(SentenceRecord.id)).scalar() or 0
-    total_vehicles  = db_session.query(
+    prior = db_session.get(HomeSummaryRecord, 1)
+    prior_articles  = prior.total_articles if prior else 0
+    prior_sentences = prior.total_sentences if prior else 0
+    prior_vehicles  = prior.total_vehicles if prior else 0
+
+    total_articles  = prior_articles + new_articles
+    total_sentences = prior_sentences + new_sentences
+    live_vehicles   = db_session.query(
         func.count(func.distinct(ArticleRecord.ideology_id))
     ).scalar() or 0
+    total_vehicles = max(prior_vehicles, live_vehicles)
     last_updated = db_session.query(func.max(ArticleRecord.published_at)).scalar()
 
     db_session.merge(HomeSummaryRecord(
@@ -256,7 +307,7 @@ def task_update_home_summary(db_session) -> None:
     ))
     db_session.commit()
     logger.info(
-        f"home_summary atualizado: {total_articles} artigos | "
+        f"home_summary atualizado (cumulativo): {total_articles} artigos | "
         f"{total_sentences} sentenças | {total_vehicles} veículos."
     )
 
@@ -271,10 +322,11 @@ def run_pipeline(window_days: int = 30) -> None:
     Pode ser agendado via Prefect:
         prefect deployment apply pipeline/deployment.yaml
     """
-    # Sessão 1: busca hashes e fecha ANTES de iniciar a coleta RSS.
-    # fetch_all_feeds leva vários minutos (scraping por artigo) — manter a
-    # conexão aberta durante esse tempo causa SSL timeout no Neon.
+    # Sessão 1: purga dados antigos, busca hashes e fecha ANTES de iniciar a
+    # coleta RSS. fetch_all_feeds leva vários minutos (scraping por artigo) —
+    # manter a conexão aberta durante esse tempo causa SSL timeout no Neon.
     with get_session() as session:
+        task_purge_old_data(session)
         existing_hashes = {row.url_hash for row in session.query(ArticleRecord.url_hash).all()}
     logger.info(f"Hashes já registrados no banco: {len(existing_hashes)}")
 
@@ -308,15 +360,15 @@ def run_pipeline(window_days: int = 30) -> None:
 
     # Sessão 2a: persiste artigos e sentenças (batch commits internos).
     with get_session() as session:
-        task_persist(articles, bias_results, session)
+        new_articles, new_sentences = task_persist(articles, bias_results, session)
 
     # Sessão 2b: agrega índices por veículo (conexão fresca, rápido).
     with get_session() as session:
         task_aggregate_contextualize(bias_results, session, window_days)
 
-    # Sessão 2c: pré-calcula totais da homepage (uma linha, leitura barata na API).
+    # Sessão 2c: soma os totais cumulativos da homepage (uma linha, leitura barata na API).
     with get_session() as session:
-        task_update_home_summary(session)
+        task_update_home_summary(session, new_articles, new_sentences)
 
 
 if __name__ == "__main__":
