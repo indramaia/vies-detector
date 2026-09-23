@@ -88,10 +88,10 @@ CORS(app, resources={r"/api/*": {"origins": ALLOWED_ORIGINS}})
 _CACHE: dict[str, tuple[float, object]] = {}  # key → (expires_monotonic, payload)
 _CACHE_LOCK = RLock()
 
-_TTL_VEHICLES = 21600  # 6h — alinhado ao ciclo do pipeline; dados só mudam quando pipeline roda
+_TTL_VEHICLES = 43200  # 12h — alinhado ao ciclo do pipeline; dados só mudam quando pipeline roda
 _TTL_STORIES  =  1800  # 30 min
-_TTL_STATS    = 21600  # 6h
-_TTL_SPECTRUM = 21600  # 6h
+_TTL_STATS    = 43200  # 12h
+_TTL_SPECTRUM = 43200  # 12h
 _TTL_ARTICLES =  1800  # 30 min
 
 # ── Mapa de sinônimos por tópico curado ───────────────────────────────────────
