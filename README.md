@@ -118,7 +118,7 @@ python api/app.py
 # https://github.com/franciellevargas/FactNews
 # Salve em data/factnews.csv
 
-python classifier/train.py --data data/factnews.csv --output models/bertimbau-bias
+python -m classifier.train --data data/factnews.csv --output models/bertimbau-bias
 ```
 
 O modelo treinado é publicado no HuggingFace Hub (`IndraSeixas/bertimbau-bias`) e baixado automaticamente pelo pipeline via `huggingface_hub.snapshot_download`.
@@ -317,31 +317,71 @@ proporção de classes do dataset original, evitando avaliação enviesada.
 
 ### Resultados
 
-Modelo base: `neuralmind/bert-base-portuguese-cased` (BERTimbau)  
-Tempo de treinamento: ~1h28min (CPU) · 5 épocas · batch efetivo 32
+Modelo base: `neuralmind/bert-base-portuguese-cased` (BERTimbau)
+Tempo de treinamento: ~1h33min (CPU) · 5 épocas · batch efetivo 32 · loss: CrossEntropy ponderada (ver seção abaixo)
 
 | Época | Macro-F1 (val) | Eval Loss |
 |-------|---------------|-----------|
-| 1     | 0.677         | 0.359     |
-| 2     | 0.787         | **0.322** |
-| 3     | 0.794         | 0.361     |
-| 4     | 0.799         | 0.425     |
-| 5     | **0.801**     | 0.449     |
+| 1     | 0.715         | 0.841     |
+| 2     | 0.772         | 0.742     |
+| 3     | 0.808         | **0.728** |
+| 4     | 0.809         | 0.735     |
+| 5     | **0.821**     | 0.742     |
 
-### Desempenho no Teste (Macro-F1: **0.80**)
+### Desempenho no Teste (Macro-F1: **0.82**, com calibração de threshold)
 
 | Classe               | Precision | Recall | F1   | Suporte |
 |----------------------|-----------|--------|------|---------|
-| Factual              | 0.92      | 0.95   | 0.94 | 425     |
-| Enviesada            | 0.57      | 0.50   | 0.53 | 56      |
-| Fortemente enviesada | 0.95      | 0.91   | 0.93 | 139     |
-| **Macro avg**        | **0.82**  | **0.79**| **0.80** | 620 |
+| Factual              | 0.93      | 0.95   | 0.94 | 425     |
+| Enviesada            | 0.59      | 0.61   | 0.60 | 56      |
+| Fortemente enviesada | 0.97      | 0.91   | 0.94 | 139     |
+| **Macro avg**        | **0.83**  | **0.82**| **0.82** | 620 |
 
-> **Interpretação:** o modelo performa bem nas classes extremas (factual e
-> fortemente enviesada), mas tem dificuldade com a classe intermediária
-> "enviesada" (F1=0.53) — reflexo direto do desequilíbrio do dataset, onde
-> essa classe representa apenas 9% das sentenças. Esse comportamento é
-> esperado e está documentado como limitação do sistema.
+Accuracy: 0.91 · Macro-F1 sem calibração de threshold (argmax padrão): 0.80.
+
+> **Interpretação:** o modelo performa muito bem nas classes extremas (factual e
+> fortemente enviesada, F1≈0.94), mas tem dificuldade com a classe intermediária
+> "enviesada" (F1=0.60) — reflexo direto do desequilíbrio do dataset, onde
+> essa classe representa apenas 9% das sentenças, e da sua ambiguidade
+> linguística inerente (é a categoria "do meio" do espectro). Esse
+> comportamento é esperado e está documentado como limitação do sistema.
+
+### Mitigação de Desbalanceamento: CE Ponderada vs. Focal Loss
+
+A classe "enviesada" (9% do corpus) é tanto rara quanto a mais ambígua das
+três. Para mitigar o desbalanceamento, duas técnicas foram comparadas sob
+condições idênticas — mesma seed (42), mesmos hiperparâmetros, mesmo split
+de teste, mesma etapa de calibração de threshold pós-treino (`--loss ce` /
+`--loss focal` em `classifier/train.py`):
+
+| Técnica | Pós-processamento | Macro-F1 geral | F1 "enviesada" | Precision | Recall | Accuracy |
+|---|---|:---:|:---:|:---:|:---:|:---:|
+| CE ponderada | argmax | 0.804 | 0.57 | 0.49 | 0.68 | 0.88 |
+| **CE ponderada** | **threshold calibrado** | **0.825** | **0.60** | **0.59** | 0.61 | **0.91** |
+| Focal Loss (γ=2) | argmax | 0.804 | 0.57 | 0.49 | 0.70 | 0.88 |
+| Focal Loss (γ=2) | threshold calibrado | 0.819 | 0.60 | 0.52 | 0.71 | 0.89 |
+
+**Achado principal:** sem calibração de threshold, as duas losses empatam
+tecnicamente (0.804 vs 0.804 — diferença de ruído). Trocar a função de
+perda, isoladamente, não trouxe ganho mensurável neste corpus — resultado
+que contraria a expectativa da literatura (JOHNSON; KHOSHGOFTAAR, 2019). O
+ganho real veio da **calibração de threshold pós-treino**, aplicada às
+duas técnicas igualmente (+2.1pp na CE, +1.5pp na Focal). Comparando as
+versões já calibradas, a CE ponderada superou a Focal Loss por ~0.5pp,
+com a mesma F1 na classe "enviesada" (0.60) mas via um trade-off
+precision/recall mais equilibrado (0.59/0.61 vs 0.52/0.71 da Focal).
+
+**Técnica escolhida: CrossEntropyLoss ponderada + calibração de
+threshold.** Maior precision na classe "enviesada" reduz o risco de rotular
+conteúdo factual como enviesado por engano — mais importante para um
+produto que expõe o BiasScore publicamente do que maximizar recall. É
+também a implementação mais simples (nativa do PyTorch, sem loss
+customizada), sem perda de desempenho frente à Focal Loss.
+
+> **Limitação:** comparação de seed única (42) — a diferença de ~0.5pp
+> entre as duas técnicas pode estar parcialmente dentro da margem de ruído
+> estatístico. Confirmação com múltiplas seeds (`--seeds 42 123 456`) é
+> trabalho futuro, não executado por restrição de tempo computacional.
 
 ---
 

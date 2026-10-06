@@ -4,9 +4,14 @@ classifier/train.py
 Fine-tuning do BERTimbau sobre o dataset FactNews para classificação
 de viés editorial em três classes.
 
-Uso:
-    python classifier/train.py --data data/factnews.csv --output models/bertimbau-bias
-    python classifier/train.py --data data/factnews.csv --output models/bertimbau-bias --seeds 42 123 456
+Uso (como módulo, a partir da raiz do projeto — o arquivo usa import relativo):
+    python -m classifier.train --data data/factnews.csv --output models/bertimbau-bias
+    python -m classifier.train --data data/factnews.csv --output models/bertimbau-bias --seeds 42 123 456
+
+Comparação controlada Focal Loss vs. CrossEntropyLoss ponderada (--loss):
+    Mesma seed, mesmo pipeline de treino/threshold tuning — só a loss muda.
+    python -m classifier.train --data data/factnews.csv --output models/bertimbau-bias-ce    --loss ce
+    python -m classifier.train --data data/factnews.csv --output models/bertimbau-bias-focal --loss focal
 
 Referências:
     DEVLIN et al. BERT (2019).
@@ -84,56 +89,60 @@ CLASS_WEIGHTS = torch.tensor([
 
 # Variante suave (sqrt) — penaliza menos, preserva melhor as classes majoritárias
 # CLASS_WEIGHTS = torch.sqrt(CLASS_WEIGHTS)
-# ── Focal Loss — Camada 2 (alternativa à loss ponderada; comentada) ───────────
+
+# ── Focal Loss — Camada 2 (ativa) ─────────────────────────────────────────────
 # Desenhada para classes desbalanceadas em detecção (LIN et al., 2017).
 # Exemplos que o modelo já acerta com alta confiança contribuem pouco para a loss;
 # exemplos difíceis (minoritária "enviesada") contribuem muito.
 # Testar γ ∈ {1, 2, 3}. Combinada com class_weights, tende a ganhar +1-2pp sobre
-# loss ponderada pura.
-#
-# class FocalLoss(nn.Module):
-#     def __init__(self, alpha=CLASS_WEIGHTS, gamma=2.0):
-#         super().__init__()
-#         self.alpha = alpha
-#         self.gamma = gamma
-#
-#     def forward(self, logits, targets):
-#         alpha = self.alpha.to(logits.device)
-#         ce = F.cross_entropy(logits, targets, weight=alpha, reduction="none")
-#         pt = torch.exp(-ce)
-#         return ((1 - pt) ** self.gamma * ce).mean()
+# loss ponderada pura — experimento em andamento para avaliar o ganho real
+# neste corpus (ver classification_report por classe no fim do treino).
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=CLASS_WEIGHTS, gamma=2.0):
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, logits, targets):
+        alpha = self.alpha.to(logits.device)
+        ce = F.cross_entropy(logits, targets, weight=alpha, reduction="none")
+        pt = torch.exp(-ce)
+        return ((1 - pt) ** self.gamma * ce).mean()
 
 
-# ── Trainer com loss ponderada — Camada 1 ────────────────────────────────────
+# ── Trainer com loss selecionável — Camada 1 ──────────────────────────────────
 class WeightedTrainer(Trainer):
     """
-    Subclasse do HuggingFace Trainer que injeta CrossEntropyLoss ponderada
-    por classe com label smoothing combinados.
+    Subclasse do HuggingFace Trainer que permite alternar entre Focal Loss
+    (LIN et al., 2017) e CrossEntropyLoss ponderada + label smoothing,
+    ambas usando os mesmos CLASS_WEIGHTS — para comparação controlada entre
+    as duas técnicas (mesma seed, mesmo pipeline de treino/threshold tuning,
+    só a loss muda).
 
-    Por que subclasse e não label_smoothing_factor do TrainingArguments?
-    TrainingArguments.label_smoothing_factor não aceita class_weights — precisam
-    ser combinados manualmente na loss. (MÜLLER et al., 2019)
+    Por que subclasse e não um argumento do Trainer? O HuggingFace Trainer não
+    expõe um hook nativo para trocar a loss — é preciso sobrescrever compute_loss.
     """
+
+    def __init__(self, *args, loss_type: str = "focal", **kwargs):
+        super().__init__(*args, **kwargs)
+        if loss_type not in ("focal", "ce"):
+            raise ValueError(f"loss_type deve ser 'focal' ou 'ce', recebido: {loss_type!r}")
+        self.loss_type = loss_type
 
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         labels = inputs.pop("labels")
         outputs = model(**inputs)
         logits = outputs.logits
-        loss_fn = nn.CrossEntropyLoss(
-            weight=CLASS_WEIGHTS.to(logits.device),
-            label_smoothing=0.1,  # preserva o label smoothing original
-        )
-        loss = loss_fn(logits, labels)
-        return (loss, outputs) if return_outputs else loss
 
-    # Alternativa com Focal Loss — substituir o compute_loss acima por:
-    # def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
-    #     labels = inputs.pop("labels")
-    #     outputs = model(**inputs)
-    #     logits = outputs.logits
-    #     focal = FocalLoss(alpha=CLASS_WEIGHTS, gamma=2.0)
-    #     loss = focal(logits, labels)
-    #     return (loss, outputs) if return_outputs else loss
+        if self.loss_type == "focal":
+            loss = FocalLoss(alpha=CLASS_WEIGHTS, gamma=2.0)(logits, labels)
+        else:  # "ce"
+            loss = nn.CrossEntropyLoss(
+                weight=CLASS_WEIGHTS.to(logits.device),
+                label_smoothing=0.1,
+            )(logits, labels)
+
+        return (loss, outputs) if return_outputs else loss
 
 
 # ── Calibração de threshold — Camada 1 ───────────────────────────────────────
@@ -247,8 +256,18 @@ def tokenize_dataset(dataset: DatasetDict, tokenizer) -> DatasetDict:
 
 # ── Treinamento principal ─────────────────────────────────────────────────────
 
-def train(data_path: str, output_dir: str, seeds: list[int] | None = None) -> None:
+def train(
+    data_path: str,
+    output_dir: str,
+    seeds: list[int] | None = None,
+    loss_type: str = "focal",
+) -> None:
     """
+    loss_type — "focal" (LIN et al., 2017) ou "ce" (CrossEntropyLoss ponderada
+        + label smoothing). Usado para comparação controlada entre as duas
+        técnicas de mitigação de desbalanceamento: mesma seed, mesmo pipeline
+        de treino/threshold tuning, só a loss muda (ver WeightedTrainer).
+
     seeds — Camada 1: média de múltiplas seeds (HENDERSON et al., 2018).
         Ex: [42, 123, 456] roda 3 treinos independentes e faz média dos logits.
         Ganho típico: +0.5-1.5pp no macro + desvio-padrão reportável na defesa
@@ -287,7 +306,8 @@ def train(data_path: str, output_dir: str, seeds: list[int] | None = None) -> No
     logger.info(f"  [4] Attention Dropout    : 0.2")
     logger.info(f"  [5] Weight Decay (L2)    : {WEIGHT_DECAY}")
     logger.info(f"  [6] Early Stop Patience  : {EARLY_STOPPING_PATIENCE} épocas")
-    logger.info(f"  [7] Loss ponderada       : pesos {CLASS_WEIGHTS.tolist()}")
+    loss_label = "Focal Loss (γ=2.0)" if loss_type == "focal" else "CE ponderada (label_smoothing=0.1)"
+    logger.info(f"  [7] Loss ({loss_type:<5})      : {loss_label} — pesos {CLASS_WEIGHTS.tolist()}")
     logger.info(f"  [8] Threshold tuning     : ativado pós-treino na validação")
     logger.info(f"  [9] Multi-seed averaging : seeds={seeds}")
     logger.info(f"  Batch efetivo            : {PER_DEVICE_TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS}")
@@ -350,6 +370,7 @@ def train(data_path: str, output_dir: str, seeds: list[int] | None = None) -> No
             data_collator=data_collator,
             compute_metrics=compute_metrics,
             callbacks=[EarlyStoppingCallback(early_stopping_patience=EARLY_STOPPING_PATIENCE)],
+            loss_type=loss_type,
         )
 
         logger.info("Iniciando fine-tuning…")
@@ -409,10 +430,10 @@ def train(data_path: str, output_dir: str, seeds: list[int] | None = None) -> No
         zero_division=0,
     )
 
-    logger.info(f"\n── Resultado argmax padrão ──\n{report_default}")
-    logger.info(f"\n── Resultado com threshold calibrado ──\n{report_tuned}")
+    logger.info(f"\n── Resultado argmax padrão ({loss_type}) ──\n{report_default}")
+    logger.info(f"\n── Resultado com threshold calibrado ({loss_type}) ──\n{report_tuned}")
     logger.info(
-        f"✅ Fine-tuning concluído.\n"
+        f"✅ Fine-tuning concluído (loss={loss_type}).\n"
         f"   Macro-F1 (média {len(seeds)} seed(s), argmax)     : {macro_f1_default:.4f} ± {std_f1:.4f}\n"
         f"   Macro-F1 (threshold calibrado no teste) : {macro_f1_tuned:.4f}\n"
         f"   F1 por seed: {[round(f, 4) for f in per_seed_f1]}"
@@ -429,5 +450,11 @@ if __name__ == "__main__":
         "--seeds", nargs="+", type=int, default=[42],
         help="Seeds para média de múltiplas rodadas (ex: --seeds 42 123 456). Camada 1.",
     )
+    parser.add_argument(
+        "--loss", choices=["focal", "ce"], default="focal",
+        help="Função de perda: 'focal' (Focal Loss, LIN et al. 2017) ou 'ce' "
+             "(CrossEntropyLoss ponderada + label smoothing). Ambas usam CLASS_WEIGHTS — "
+             "use o mesmo --output com sufixos diferentes (-ce / -focal) para comparar.",
+    )
     args = parser.parse_args()
-    train(args.data, args.output, seeds=args.seeds)
+    train(args.data, args.output, seeds=args.seeds, loss_type=args.loss)
