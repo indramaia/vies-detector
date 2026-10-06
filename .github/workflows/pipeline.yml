@@ -2,7 +2,11 @@ name: Pipeline - Coleta e Classificação
 
 on:
   schedule:
-    - cron: '0 */12 * * *'   # a cada 12 horas
+    # a cada 12 horas — reatribuído em 2026-10-06 após 35 dias sem disparo
+    # automático (GitHub Actions trata scheduled runs como "best effort" e
+    # pode parar de acioná-los silenciosamente após falhas/baixa atividade;
+    # tocar o arquivo força o agendador a reavaliar o cron).
+    - cron: '0 */12 * * *'
   workflow_dispatch:          # permite rodar manualmente
 
 jobs:
