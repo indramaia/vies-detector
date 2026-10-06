@@ -295,7 +295,7 @@ Incerteza = desvio-padrão(sᵢ)
 
 ## 🧪 Experimento de Treinamento
 
-### Dataset e Divisão
+### Dataset 
 
 O classificador foi treinado sobre o **FactNews** (Vargas et al., RANLP 2023),
 composto por 6.191 sentenças de notícias brasileiras anotadas por especialistas.
